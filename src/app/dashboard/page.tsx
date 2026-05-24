@@ -134,6 +134,7 @@ export default async function DashboardPage() {
       include: { game: true },
       orderBy: [
         { lastPlayedAt: { sort: "desc", nulls: "last" } },
+        { steamPlaytime2weeksMinutes: { sort: "desc", nulls: "last" } },
         { addedAt: "desc" },
       ],
       take: 10,
