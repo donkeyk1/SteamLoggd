@@ -13,7 +13,21 @@ type MatchedTitle = {
   title: string;
   igdb: GameSearchResult | null;
   error?: boolean;
+  // Per-game overrides (only set on the games path); fall back to batch values
+  statusOverride?: z.infer<typeof StatusEnum>;
+  priorityOverride?: number;
+  platformOverride?: string | null;
 };
+
+const StatusEnum = z.enum([
+  "WISHLIST",
+  "UNTRIAGED",
+  "UNPLAYED",
+  "PLAYING",
+  "PAUSED",
+  "BEAT",
+  "DROPPED",
+]);
 
 const ResolvedGameSchema = z.object({
   igdbId: z.number().int().positive(),
@@ -21,6 +35,10 @@ const ResolvedGameSchema = z.object({
   coverUrl: z.string().url().max(500).optional(),
   genres: z.array(z.string().max(60)).max(20).default([]),
   releaseYear: z.number().int().min(1950).max(2100).optional(),
+  // Per-game overrides — optional so older callers / titles-path still work
+  status: StatusEnum.optional(),
+  priority: z.coerce.number().int().min(1).max(5).optional(),
+  platform: z.string().max(60).nullable().optional(),
 });
 
 // Accepts either:
@@ -31,9 +49,9 @@ const BulkAddSchema = z
   .object({
     titles: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
     games: z.array(ResolvedGameSchema).max(30).optional(),
-    status: z
-      .enum(["WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
-      .default("UNTRIAGED"),
+    // Batch defaults — applied to all titles path entries, and as fallback for
+    // games path entries that don't specify their own values.
+    status: StatusEnum.default("UNTRIAGED"),
     priority: z.coerce.number().int().min(1).max(5).default(3),
     platform: z.string().max(60).optional(),
   })
@@ -65,12 +83,11 @@ export async function POST(req: NextRequest) {
 
   const { titles, games, status, priority, platform } = parsed.data;
   const userId = session.userId;
-  const isFinished = status === "BEAT" || status === "DROPPED";
 
   // Build the `matches` list. Either path produces the same shape.
   let matches: MatchedTitle[];
   if (games && games.length > 0) {
-    // Pre-resolved — dedupe by igdbId
+    // Pre-resolved — dedupe by igdbId; carry per-game overrides through
     const seen = new Set<number>();
     matches = [];
     for (const g of games) {
@@ -85,6 +102,9 @@ export async function POST(req: NextRequest) {
           genres: g.genres,
           releaseYear: g.releaseYear,
         },
+        statusOverride: g.status,
+        priorityOverride: g.priority,
+        platformOverride: g.platform === undefined ? undefined : g.platform,
       });
     }
   } else {
@@ -143,14 +163,20 @@ export async function POST(req: NextRequest) {
           })
         : await db.game.create({ data: { title: m.title, genres: [] } });
 
+      const effectiveStatus = m.statusOverride ?? status;
+      const effectivePriority = m.priorityOverride ?? priority;
+      const effectivePlatform =
+        m.platformOverride !== undefined ? m.platformOverride : platform ?? null;
+      const isFinished = effectiveStatus === "BEAT" || effectiveStatus === "DROPPED";
+
       await db.userGame.create({
         data: {
           userId,
           gameId: game.id,
           source: "MANUAL",
-          platform: platform ?? null,
-          status,
-          priority,
+          platform: effectivePlatform,
+          status: effectiveStatus,
+          priority: effectivePriority,
           ...(isFinished ? { finishedAt: new Date() } : {}),
         },
       });

@@ -23,6 +23,12 @@ type Suggestion = {
   genres: string[];
 };
 
+type StagedGame = Suggestion & {
+  status: GameStatus;
+  priority: number;
+  platform: string | null;
+};
+
 type BulkResult = {
   title: string;
   status: "added" | "duplicate" | "no_match" | "error";
@@ -43,9 +49,14 @@ export function AddGameForm() {
   // Single mode
   const [picked, setPicked] = useState<Suggestion | null>(null);
 
-  // Bulk mode
-  const [staged, setStaged] = useState<Suggestion[]>([]);
+  // Bulk mode — each staged game has its own status/priority/platform.
+  // New picks inherit the last values the user chose, so adding many PS games
+  // doesn't make them re-pick PlayStation every time.
+  const [staged, setStaged] = useState<StagedGame[]>([]);
   const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
+  const [lastBulkStatus, setLastBulkStatus] = useState<GameStatus>("UNTRIAGED");
+  const [lastBulkPriority, setLastBulkPriority] = useState(3);
+  const [lastBulkPlatform, setLastBulkPlatform] = useState<string | null>(null);
 
   // Shared settings
   const [status, setStatus] = useState<GameStatus>("UNTRIAGED");
@@ -101,7 +112,15 @@ export function AddGameForm() {
   function pickSuggestion(s: Suggestion) {
     if (mode === "bulk") {
       if (!staged.find((g) => g.igdbId === s.igdbId)) {
-        setStaged((prev) => [...prev, s]);
+        setStaged((prev) => [
+          ...prev,
+          {
+            ...s,
+            status: lastBulkStatus,
+            priority: lastBulkPriority,
+            platform: lastBulkPlatform,
+          },
+        ]);
       }
       setTitle("");
       setSuggestions([]);
@@ -114,6 +133,13 @@ export function AddGameForm() {
 
   function removeStaged(igdbId: number) {
     setStaged((prev) => prev.filter((g) => g.igdbId !== igdbId));
+  }
+
+  function updateStaged(igdbId: number, patch: Partial<Pick<StagedGame, "status" | "priority" | "platform">>) {
+    setStaged((prev) => prev.map((g) => (g.igdbId === igdbId ? { ...g, ...patch } : g)));
+    if (patch.status !== undefined) setLastBulkStatus(patch.status);
+    if (patch.priority !== undefined) setLastBulkPriority(patch.priority);
+    if (patch.platform !== undefined) setLastBulkPlatform(patch.platform);
   }
 
   function clearPicked() {
@@ -137,10 +163,10 @@ export function AddGameForm() {
           coverUrl: s.coverUrl,
           genres: s.genres,
           releaseYear: s.releaseYear,
+          status: s.status,
+          priority: s.priority,
+          platform: s.platform,
         })),
-        status,
-        priority,
-        ...(platform ? { platform } : {}),
       }),
     });
     setSubmitting(false);
@@ -311,9 +337,9 @@ export function AddGameForm() {
             )}
           </div>
 
-          {/* Staged list */}
+          {/* Staged list — each row has its own status/platform/priority */}
           {staged.length > 0 && (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
+            <div className="space-y-1.5 max-h-[28rem] overflow-y-auto">
               {staged.map((s) => (
                 <div
                   key={s.igdbId}
@@ -332,6 +358,37 @@ export function AddGameForm() {
                       {s.genres.length ? ` · ${s.genres.slice(0, 2).join(", ")}` : ""}
                     </div>
                   </div>
+                  <select
+                    value={s.status}
+                    onChange={(e) => updateStaged(s.igdbId, { status: e.target.value as GameStatus })}
+                    className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    title="Status"
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt.toLowerCase()}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={s.platform ?? ""}
+                    onChange={(e) => updateStaged(s.igdbId, { platform: e.target.value || null })}
+                    className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    title="Platform"
+                  >
+                    <option value="">—</option>
+                    {PLATFORMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={s.priority}
+                    onChange={(e) => updateStaged(s.igdbId, { priority: Number(e.target.value) })}
+                    className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    title="Priority"
+                  >
+                    {[1, 2, 3, 4, 5].map((p) => (
+                      <option key={p} value={p}>P{p}</option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => removeStaged(s.igdbId)}
@@ -342,40 +399,6 @@ export function AddGameForm() {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Settings row — only shown once something is staged */}
-          {staged.length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as GameStatus)}
-                className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s.toLowerCase()}</option>
-                ))}
-              </select>
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-              >
-                <option value="">Platform…</option>
-                {PLATFORMS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(Number(e.target.value))}
-                className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-              >
-                {[1, 2, 3, 4, 5].map((p) => (
-                  <option key={p} value={p}>Priority {p}</option>
-                ))}
-              </select>
             </div>
           )}
 
