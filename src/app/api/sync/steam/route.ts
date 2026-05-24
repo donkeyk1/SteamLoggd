@@ -60,10 +60,12 @@ export async function POST() {
               gameId,
               source: "STEAM",
               steamPlaytimeMinutes: g.playtime_forever,
+              steamPlaytime2weeksMinutes: g.playtime_2weeks ?? null,
               lastPlayedAt,
             },
             update: {
               steamPlaytimeMinutes: g.playtime_forever,
+              steamPlaytime2weeksMinutes: g.playtime_2weeks ?? null,
               ...(lastPlayedAt ? { lastPlayedAt } : {}),
             },
           });

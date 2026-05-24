@@ -66,8 +66,9 @@ model UserGame {
   isMultiplayer         Boolean    @default(false)
   wantReplay            Boolean    @default(false)
 
-  steamPlaytimeMinutes  Int?
-  manualPlaytimeMinutes Int?
+  steamPlaytimeMinutes      Int?
+  steamPlaytime2weeksMinutes Int?
+  manualPlaytimeMinutes     Int?
 
   rating                Int?
   notes                 String?
