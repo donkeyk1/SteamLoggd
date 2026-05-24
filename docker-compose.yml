@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: gamebacklog-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamebacklog
+      POSTGRES_PASSWORD: gamebacklog_dev
+      POSTGRES_DB: gamebacklog
+    ports:
+      - "5432:5432"
+    volumes:
+      - gamebacklog_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamebacklog -d gamebacklog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gamebacklog_pgdata:

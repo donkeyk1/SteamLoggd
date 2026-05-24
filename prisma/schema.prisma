@@ -1,0 +1,105 @@
+// Prisma schema for the GameBacklog app.
+// Run `npx prisma migrate dev --name init` to create tables locally.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String     @id @default(cuid())
+  steamId     String     @unique
+  displayName String
+  avatarUrl   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  userGames   UserGame[]
+  syncJobs    SyncJob[]
+}
+
+model Game {
+  id            String     @id @default(cuid())
+  igdbId        Int?       @unique
+  steamAppId    Int?       @unique
+  title         String
+  coverUrl      String?
+  genres        String[]   @default([])
+  releaseYear   Int?
+  hltbMainHours Float?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  userGames     UserGame[]
+
+  @@index([title])
+}
+
+enum GameSource {
+  STEAM
+  MANUAL
+}
+
+enum GameStatus {
+  UNTRIAGED // synced/added but you haven't decided what to do with it yet
+  UNPLAYED  // you've decided you don't intend to play this
+  PLAYING
+  PAUSED
+  BEAT
+  DROPPED
+}
+
+model UserGame {
+  id                    String     @id @default(cuid())
+  userId                String
+  gameId                String
+
+  source                GameSource
+  platform              String?    // null = derive from source (e.g. "Steam"); set for manual entries
+  status                GameStatus @default(UNTRIAGED)
+  priority              Int        @default(3) // 1-5
+  mood                  String[]   @default([]) // ["chill","story",...]
+  isMultiplayer         Boolean    @default(false)
+  wantReplay            Boolean    @default(false)
+
+  steamPlaytimeMinutes  Int?
+  manualPlaytimeMinutes Int?
+
+  rating                Int?
+  notes                 String?
+
+  addedAt               DateTime   @default(now())
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  lastPlayedAt          DateTime?
+
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game                  Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+  @@index([userId, status])
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model SyncJob {
+  id          String        @id @default(cuid())
+  userId      String
+  type        String        // e.g. "steam_library"
+  startedAt   DateTime      @default(now())
+  finishedAt  DateTime?
+  status      SyncJobStatus @default(PENDING)
+  error       String?
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}
