@@ -26,6 +26,7 @@ type Suggestion = {
 type StagedGame = Suggestion & {
   status: GameStatus;
   priority: number;
+  rating: number | null;
   platform: string | null;
 };
 
@@ -118,6 +119,7 @@ export function AddGameForm() {
             ...s,
             status: lastBulkStatus,
             priority: lastBulkPriority,
+            rating: null,
             platform: lastBulkPlatform,
           },
         ]);
@@ -135,7 +137,7 @@ export function AddGameForm() {
     setStaged((prev) => prev.filter((g) => g.igdbId !== igdbId));
   }
 
-  function updateStaged(igdbId: number, patch: Partial<Pick<StagedGame, "status" | "priority" | "platform">>) {
+  function updateStaged(igdbId: number, patch: Partial<Pick<StagedGame, "status" | "priority" | "rating" | "platform">>) {
     setStaged((prev) => prev.map((g) => (g.igdbId === igdbId ? { ...g, ...patch } : g)));
     if (patch.status !== undefined) setLastBulkStatus(patch.status);
     if (patch.priority !== undefined) setLastBulkPriority(patch.priority);
@@ -165,6 +167,7 @@ export function AddGameForm() {
           releaseYear: s.releaseYear,
           status: s.status,
           priority: s.priority,
+          rating: s.rating,
           platform: s.platform,
         })),
       }),
@@ -379,16 +382,30 @@ export function AddGameForm() {
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
-                  <select
-                    value={s.priority}
-                    onChange={(e) => updateStaged(s.igdbId, { priority: Number(e.target.value) })}
-                    className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                    title="Priority"
-                  >
-                    {[1, 2, 3, 4, 5].map((p) => (
-                      <option key={p} value={p}>P{p}</option>
-                    ))}
-                  </select>
+                  {s.status === "BEAT" || s.status === "DROPPED" ? (
+                    <select
+                      value={s.rating ?? ""}
+                      onChange={(e) => updateStaged(s.igdbId, { rating: e.target.value ? Number(e.target.value) : null })}
+                      className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                      title="Rating"
+                    >
+                      <option value="">Rate…</option>
+                      {[1, 2, 3, 4, 5].map((r) => (
+                        <option key={r} value={r}>{"★".repeat(r)}{"☆".repeat(5 - r)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={s.priority}
+                      onChange={(e) => updateStaged(s.igdbId, { priority: Number(e.target.value) })}
+                      className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                      title="Priority"
+                    >
+                      {[1, 2, 3, 4, 5].map((p) => (
+                        <option key={p} value={p}>P{p}</option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeStaged(s.igdbId)}

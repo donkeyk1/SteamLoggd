@@ -16,6 +16,7 @@ type MatchedTitle = {
   // Per-game overrides (only set on the games path); fall back to batch values
   statusOverride?: z.infer<typeof StatusEnum>;
   priorityOverride?: number;
+  ratingOverride?: number | null;
   platformOverride?: string | null;
 };
 
@@ -38,6 +39,7 @@ const ResolvedGameSchema = z.object({
   // Per-game overrides — optional so older callers / titles-path still work
   status: StatusEnum.optional(),
   priority: z.coerce.number().int().min(1).max(5).optional(),
+  rating: z.coerce.number().int().min(1).max(5).nullable().optional(),
   platform: z.string().max(60).nullable().optional(),
 });
 
@@ -104,6 +106,7 @@ export async function POST(req: NextRequest) {
         },
         statusOverride: g.status,
         priorityOverride: g.priority,
+        ratingOverride: g.rating,
         platformOverride: g.platform === undefined ? undefined : g.platform,
       });
     }
@@ -165,6 +168,7 @@ export async function POST(req: NextRequest) {
 
       const effectiveStatus = m.statusOverride ?? status;
       const effectivePriority = m.priorityOverride ?? priority;
+      const effectiveRating = m.ratingOverride ?? null;
       const effectivePlatform =
         m.platformOverride !== undefined ? m.platformOverride : platform ?? null;
       const isFinished = effectiveStatus === "BEAT" || effectiveStatus === "DROPPED";
@@ -178,6 +182,7 @@ export async function POST(req: NextRequest) {
           status: effectiveStatus,
           priority: effectivePriority,
           ...(isFinished ? { finishedAt: new Date() } : {}),
+          ...(isFinished && effectiveRating ? { rating: effectiveRating } : {}),
         },
       });
 
