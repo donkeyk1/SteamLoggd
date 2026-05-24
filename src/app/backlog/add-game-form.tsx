@@ -22,10 +22,19 @@ type Suggestion = {
   genres: string[];
 };
 
+type BulkResult = {
+  title: string;
+  status: "added" | "duplicate" | "no_match" | "error";
+  matched?: string;
+};
+
 export function AddGameForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"single" | "bulk">("single");
   const [title, setTitle] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
   const [picked, setPicked] = useState<Suggestion | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [searching, setSearching] = useState(false);
@@ -90,6 +99,45 @@ export function AddGameForm() {
     setPicked(null);
   }
 
+  async function handleBulkSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setBulkResults(null);
+
+    const titles = bulkText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 30);
+    if (titles.length === 0) {
+      setSubmitting(false);
+      setError("Add at least one title (one per line).");
+      return;
+    }
+
+    const res = await fetch("/api/games/bulk-add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        titles,
+        status,
+        priority,
+        ...(platform ? { platform } : {}),
+      }),
+    });
+    setSubmitting(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(`Failed: ${data.error ?? res.statusText}`);
+      return;
+    }
+    const data = (await res.json()) as { results: BulkResult[] };
+    setBulkResults(data.results);
+    setBulkText("");
+    startTransition(() => router.refresh());
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -149,9 +197,52 @@ export function AddGameForm() {
   }
 
   return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 space-y-3">
+      <div className="flex gap-1 text-xs">
+        <button
+          type="button"
+          onClick={() => { setMode("single"); setBulkResults(null); setError(null); }}
+          className={`px-3 py-1 rounded-md transition-colors ${
+            mode === "single"
+              ? "bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 font-medium"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+          }`}
+        >
+          Single
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode("bulk"); setBulkResults(null); setError(null); }}
+          className={`px-3 py-1 rounded-md transition-colors ${
+            mode === "bulk"
+              ? "bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 font-medium"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+          }`}
+        >
+          Bulk
+        </button>
+      </div>
+
+      {mode === "bulk" ? (
+        <BulkAddForm
+          bulkText={bulkText}
+          setBulkText={setBulkText}
+          status={status}
+          setStatus={setStatus}
+          priority={priority}
+          setPriority={setPriority}
+          platform={platform}
+          setPlatform={setPlatform}
+          submitting={submitting}
+          onSubmit={handleBulkSubmit}
+          onCancel={() => { setOpen(false); setError(null); setBulkResults(null); }}
+          results={bulkResults}
+          error={error}
+        />
+      ) : (
     <form
       onSubmit={handleSubmit}
-      className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 space-y-3"
+      className="space-y-3"
     >
       <div className="relative">
         <div className="flex flex-wrap gap-3">
@@ -315,6 +406,139 @@ export function AddGameForm() {
           <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
         )}
       </div>
+    </form>
+      )}
+    </div>
+  );
+}
+
+function BulkAddForm({
+  bulkText,
+  setBulkText,
+  status,
+  setStatus,
+  priority,
+  setPriority,
+  platform,
+  setPlatform,
+  submitting,
+  onSubmit,
+  onCancel,
+  results,
+  error,
+}: {
+  bulkText: string;
+  setBulkText: (v: string) => void;
+  status: GameStatus;
+  setStatus: (v: GameStatus) => void;
+  priority: number;
+  setPriority: (v: number) => void;
+  platform: string;
+  setPlatform: (v: string) => void;
+  submitting: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  results: BulkResult[] | null;
+  error: string | null;
+}) {
+  const lineCount = bulkText.split("\n").filter((s) => s.trim()).length;
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <div>
+        <textarea
+          value={bulkText}
+          onChange={(e) => setBulkText(e.target.value)}
+          rows={6}
+          placeholder={"Paste game titles, one per line. Max 30.\n\nGod of War Ragnarök\nHades II\nElden Ring"}
+          className="w-full px-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 font-mono"
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          {lineCount} title{lineCount === 1 ? "" : "s"} · IGDB will look up cover, genres, and HLTB for each
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as GameStatus)}
+          className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+        >
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s.toLowerCase()}</option>
+          ))}
+        </select>
+        <select
+          value={platform}
+          onChange={(e) => setPlatform(e.target.value)}
+          className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+        >
+          <option value="">Platform…</option>
+          {PLATFORMS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(Number(e.target.value))}
+          className="px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+        >
+          {[1, 2, 3, 4, 5].map((p) => (
+            <option key={p} value={p}>Priority {p}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={submitting || lineCount === 0}
+          className="rounded-md bg-zinc-900 hover:bg-zinc-700 disabled:opacity-50 px-3 py-1.5 text-sm text-white dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        >
+          {submitting ? "Adding…" : `Add ${lineCount} game${lineCount === 1 ? "" : "s"}`}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+        >
+          Cancel
+        </button>
+        {error && (
+          <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+        )}
+      </div>
+
+      {results && results.length > 0 && (
+        <div className="rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 space-y-1 max-h-64 overflow-y-auto">
+          <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+            Results
+          </p>
+          {results.map((r, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              <span
+                className={`w-16 shrink-0 font-medium ${
+                  r.status === "added"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : r.status === "no_match"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : r.status === "duplicate"
+                    ? "text-zinc-500"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
+                {r.status === "added" ? "✓ added" : r.status === "no_match" ? "no match" : r.status}
+              </span>
+              <span className="text-zinc-700 dark:text-zinc-300 truncate">
+                {r.title}
+                {r.matched && r.matched !== r.title && (
+                  <span className="text-zinc-500"> → {r.matched}</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </form>
   );
 }

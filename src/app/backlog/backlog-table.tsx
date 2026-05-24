@@ -34,6 +34,66 @@ export function BacklogTable({
   const [, startTransition] = useTransition();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === rows.length) setSelected(new Set());
+    else setSelected(new Set(rows.map((r) => r.id)));
+  }
+
+  async function bulkPatch(updates: Record<string, unknown>) {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    const res = await fetch("/api/games/bulk", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selected], updates }),
+    });
+    setBulkBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(`Bulk update failed: ${data.error ?? res.statusText}`);
+      return;
+    }
+    setSelected(new Set());
+    startTransition(() => router.refresh());
+  }
+
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    if (!confirm(`Remove ${selected.size} game${selected.size === 1 ? "" : "s"} from your library?`)) return;
+    setBulkBusy(true);
+    setError(null);
+    const res = await fetch("/api/games/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selected] }),
+    });
+    setBulkBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(`Bulk remove failed: ${data.error ?? res.statusText}`);
+      return;
+    }
+    setSelected(new Set());
+    startTransition(() => router.refresh());
+  }
+
+  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const allSelectedFinished =
+    selectedRows.length > 0 &&
+    selectedRows.every((r) => r.status === "BEAT" || r.status === "DROPPED");
 
   async function patch(id: string, body: Record<string, unknown>) {
     setSavingId(id);
@@ -78,10 +138,109 @@ export function BacklogTable({
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-20 rounded-lg border border-violet-400 dark:border-violet-600 bg-violet-50 dark:bg-violet-950/80 backdrop-blur p-2.5 flex flex-wrap items-center gap-2 shadow-lg">
+          <span className="text-sm font-medium text-violet-900 dark:text-violet-100 px-1">
+            {selected.size} selected
+          </span>
+          <select
+            disabled={bulkBusy}
+            defaultValue=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              bulkPatch({ status: e.target.value as GameStatus });
+              e.target.value = "";
+            }}
+            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
+          >
+            <option value="">Set status…</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s.toLowerCase()}</option>
+            ))}
+          </select>
+          <select
+            disabled={bulkBusy}
+            defaultValue=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              bulkPatch({ priority: Number(e.target.value) });
+              e.target.value = "";
+            }}
+            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
+          >
+            <option value="">Set priority…</option>
+            {[1, 2, 3, 4, 5].map((p) => (
+              <option key={p} value={p}>P{p}</option>
+            ))}
+          </select>
+          {allSelectedFinished && (
+            <select
+              disabled={bulkBusy}
+              defaultValue=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                bulkPatch({ rating: Number(e.target.value) });
+                e.target.value = "";
+              }}
+              className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
+            >
+              <option value="">Set rating…</option>
+              {[1, 2, 3, 4, 5].map((r) => (
+                <option key={r} value={r}>
+                  {"★".repeat(r)}{"☆".repeat(5 - r)}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => bulkPatch({ isMultiplayer: true })}
+            className="px-2 py-1 text-xs rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950 disabled:opacity-50"
+          >
+            Mark MP
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => bulkPatch({ isMultiplayer: false })}
+            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+          >
+            Unmark MP
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={bulkDelete}
+            className="px-2 py-1 text-xs rounded-md border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 disabled:opacity-50"
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="ml-auto px-2 py-1 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400">
             <tr>
+              <th className="px-3 py-2 w-8">
+                <input
+                  type="checkbox"
+                  checked={rows.length > 0 && selected.size === rows.length}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selected.size > 0 && selected.size < rows.length;
+                  }}
+                  onChange={toggleAll}
+                  className="accent-violet-500 cursor-pointer"
+                  aria-label="Select all"
+                />
+              </th>
               <th className="font-medium px-4 py-2 w-14"></th>
               <th className="text-left font-medium px-4 py-2">Game</th>
               <th className="text-left font-medium px-4 py-2 w-40">Status</th>
@@ -96,7 +255,23 @@ export function BacklogTable({
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {rows.map((row) => (
-              <tr key={row.id} className="bg-white dark:bg-zinc-950">
+              <tr
+                key={row.id}
+                className={`${
+                  selected.has(row.id)
+                    ? "bg-violet-50 dark:bg-violet-950/30"
+                    : "bg-white dark:bg-zinc-950"
+                }`}
+              >
+                <td className="px-3 py-1">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(row.id)}
+                    onChange={() => toggle(row.id)}
+                    className="accent-violet-500 cursor-pointer"
+                    aria-label={`Select ${row.game.title}`}
+                  />
+                </td>
                 <td className="pl-4 py-1">
                   {row.game.coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
