@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 
 const PatchSchema = z.object({
   status: z
-    .enum(["UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
+    .enum(["WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
     .optional(),
   priority: z.coerce.number().int().min(1).max(5).optional(),
   notes: z.string().max(2000).nullable().optional(),

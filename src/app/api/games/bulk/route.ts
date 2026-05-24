@@ -8,7 +8,7 @@ const BulkPatchSchema = z.object({
   updates: z
     .object({
       status: z
-        .enum(["UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
+        .enum(["WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
         .optional(),
       priority: z.coerce.number().int().min(1).max(5).optional(),
       rating: z.coerce.number().int().min(1).max(5).nullable().optional(),

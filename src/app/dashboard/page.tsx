@@ -27,6 +27,11 @@ const STATUS_STYLES: Record<
   GameStatus,
   { label: string; bar: string; pill: string }
 > = {
+  WISHLIST: {
+    label: "Wishlist",
+    bar: "bg-violet-500",
+    pill: "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30",
+  },
   UNTRIAGED: {
     label: "Untriaged",
     bar: "bg-zinc-500",
@@ -172,6 +177,7 @@ export default async function DashboardPage() {
   const avgRating = beatStats._avg.rating ?? 0;
 
   const statusCounts: Record<GameStatus, number> = {
+    WISHLIST: 0,
     UNTRIAGED: 0,
     UNPLAYED: 0,
     PLAYING: 0,
