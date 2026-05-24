@@ -31,14 +31,9 @@ export async function POST(req: NextRequest) {
       where: {
         userId: session.userId,
         ...(moods.includes("multiplayer") ? {} : { isMultiplayer: false }),
-        AND: [
-          { OR: [{ platform: null }, { platform: { not: "Wishlist" } }] },
-          {
-            OR: [
-              { status: { in: ["UNPLAYED", "PAUSED"] } },
-              { status: "BEAT", wantReplay: true },
-            ],
-          },
+        OR: [
+          { status: { in: ["UNPLAYED", "PAUSED"] } },
+          { status: "BEAT", wantReplay: true },
         ],
       },
       include: { game: true },

@@ -7,7 +7,7 @@ import { fetchTimeToBeats } from "@/lib/igdb/client";
 const AddGameSchema = z.object({
   title: z.string().trim().min(1).max(200),
   status: z
-    .enum(["UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
+    .enum(["WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
     .default("UNTRIAGED"),
   priority: z.coerce.number().int().min(1).max(5).default(3),
   rating: z.coerce.number().int().min(1).max(5).nullable().optional(),

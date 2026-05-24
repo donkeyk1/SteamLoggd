@@ -8,6 +8,7 @@ import { PLATFORMS } from "@/lib/platforms";
 type Row = UserGame & { game: Game };
 
 const STATUS_OPTIONS: GameStatus[] = [
+  "WISHLIST",
   "UNTRIAGED",
   "UNPLAYED",
   "PLAYING",

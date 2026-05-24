@@ -4,7 +4,6 @@ export const PLATFORMS = [
   "Epic Games",
   "Nintendo Switch",
   "GOG",
-  "Wishlist",
   "Other",
 ] as const;
 

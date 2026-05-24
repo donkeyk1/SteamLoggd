@@ -44,8 +44,9 @@ enum GameSource {
 }
 
 enum GameStatus {
+  WISHLIST  // want it but haven't decided to play yet
   UNTRIAGED // synced/added but you haven't decided what to do with it yet
-  UNPLAYED  // you've decided you don't intend to play this
+  UNPLAYED  // you've decided you want to play this
   PLAYING
   PAUSED
   BEAT

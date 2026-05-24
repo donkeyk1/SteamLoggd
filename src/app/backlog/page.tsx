@@ -7,6 +7,7 @@ import { BacklogTable } from "./backlog-table";
 import { AddGameForm } from "./add-game-form";
 
 const ALL_STATUSES: GameStatus[] = [
+  "WISHLIST",
   "UNTRIAGED",
   "UNPLAYED",
   "PLAYING",
@@ -74,6 +75,7 @@ export default async function BacklogPage({
     ]);
 
   const countsByStatus: Record<GameStatus, number> = {
+    WISHLIST: 0,
     UNTRIAGED: 0,
     UNPLAYED: 0,
     PLAYING: 0,

@@ -9,6 +9,7 @@ const MULTIPLAYER_KEY = "multiplayer";
 
 const STATUS_TABS: { label: string; value: GameStatus | "all" | typeof UNENRICHED_KEY | typeof MULTIPLAYER_KEY }[] = [
   { label: "All", value: "all" },
+  { label: "Wishlist", value: "WISHLIST" },
   { label: "Untriaged", value: "UNTRIAGED" },
   { label: "Playing", value: "PLAYING" },
   { label: "Paused", value: "PAUSED" },

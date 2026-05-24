@@ -15,14 +15,32 @@ type MatchedTitle = {
   error?: boolean;
 };
 
-const BulkAddSchema = z.object({
-  titles: z.array(z.string().trim().min(1).max(200)).min(1).max(30),
-  status: z
-    .enum(["UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
-    .default("UNTRIAGED"),
-  priority: z.coerce.number().int().min(1).max(5).default(3),
-  platform: z.string().max(60).optional(),
+const ResolvedGameSchema = z.object({
+  igdbId: z.number().int().positive(),
+  title: z.string().trim().min(1).max(200),
+  coverUrl: z.string().url().max(500).optional(),
+  genres: z.array(z.string().max(60)).max(20).default([]),
+  releaseYear: z.number().int().min(1950).max(2100).optional(),
 });
+
+// Accepts either:
+//   - `titles`: free-text list; we search IGDB for each (fuzzy matching, may miss)
+//   - `games`:  pre-resolved IGDB picks from the autocomplete UI (no IGDB search needed,
+//               so no per-game rate-limit risk and exact matches guaranteed)
+const BulkAddSchema = z
+  .object({
+    titles: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
+    games: z.array(ResolvedGameSchema).max(30).optional(),
+    status: z
+      .enum(["WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED"])
+      .default("UNTRIAGED"),
+    priority: z.coerce.number().int().min(1).max(5).default(3),
+    platform: z.string().max(60).optional(),
+  })
+  .refine(
+    (d) => (d.titles?.length ?? 0) > 0 || (d.games?.length ?? 0) > 0,
+    { message: "must provide titles or games" }
+  );
 
 type ResultRow = {
   title: string;
@@ -45,28 +63,48 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { titles, status, priority, platform } = parsed.data;
+  const { titles, games, status, priority, platform } = parsed.data;
   const userId = session.userId;
   const isFinished = status === "BEAT" || status === "DROPPED";
 
-  // Dedupe input titles (case-insensitive) so we don't search the same string twice
-  const unique = Array.from(
-    new Map(titles.map((t) => [t.toLowerCase(), t])).values()
-  );
+  // Build the `matches` list. Either path produces the same shape.
+  let matches: MatchedTitle[];
+  if (games && games.length > 0) {
+    // Pre-resolved — dedupe by igdbId
+    const seen = new Set<number>();
+    matches = [];
+    for (const g of games) {
+      if (seen.has(g.igdbId)) continue;
+      seen.add(g.igdbId);
+      matches.push({
+        title: g.title,
+        igdb: {
+          igdbId: g.igdbId,
+          title: g.title,
+          coverUrl: g.coverUrl,
+          genres: g.genres,
+          releaseYear: g.releaseYear,
+        },
+      });
+    }
+  } else {
+    // Title-based — dedupe case-insensitively, then search IGDB in parallel
+    const unique = Array.from(
+      new Map((titles ?? []).map((t) => [t.toLowerCase(), t])).values()
+    );
+    matches = await Promise.all(
+      unique.map(async (title): Promise<MatchedTitle> => {
+        try {
+          const results = await searchGames(title, 1);
+          return { title, igdb: results[0] ?? null };
+        } catch {
+          return { title, igdb: null, error: true };
+        }
+      })
+    );
+  }
 
-  // IGDB search in parallel (capped to 30 by schema, so fine)
-  const matches: MatchedTitle[] = await Promise.all(
-    unique.map(async (title): Promise<MatchedTitle> => {
-      try {
-        const results = await searchGames(title, 1);
-        return { title, igdb: results[0] ?? null };
-      } catch {
-        return { title, igdb: null, error: true };
-      }
-    })
-  );
-
-  // Batch HLTB lookup for everything we matched
+  // Single batched HLTB lookup for every match we have an IGDB id for.
   const matchedIgdbIds = matches
     .map((m) => m.igdb?.igdbId)
     .filter((id): id is number => typeof id === "number");
