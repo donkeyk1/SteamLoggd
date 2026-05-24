@@ -3,8 +3,12 @@ import { RelyingParty } from "openid";
 const STEAM_OPENID_URL = "https://steamcommunity.com/openid";
 
 function getReturnUrl() {
-  const base = process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  return `${base}/api/auth/steam/callback`;
+  const base =
+    process.env.APP_URL ??
+    process.env.AUTH_URL ??
+    process.env.NEXTAUTH_URL ??
+    "http://localhost:3000";
+  return `${base}/api/steam/link/callback`;
 }
 
 function getRelyingParty() {

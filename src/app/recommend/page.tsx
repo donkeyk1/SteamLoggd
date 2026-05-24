@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { requireSession } from "@/lib/auth";
 import { RecommendClient } from "./recommend-client";
 
 export default async function RecommendPage() {
-  const session = await getSession();
-  if (!session.userId) redirect("/");
+  await requireSession();
 
   return (
     <main className="min-h-screen p-8 bg-zinc-50 dark:bg-zinc-950">

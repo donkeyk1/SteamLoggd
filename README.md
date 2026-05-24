@@ -1,6 +1,6 @@
 # Steamloggd
 
-A personal game backlog tracker. Sign in with Steam to auto-sync your library, manually add games from any platform, and get recommendations based on your available time and mood.
+A personal game backlog tracker. Sign in with Google / GitHub / Discord, optionally link Steam to auto-sync your library, manually add games from any platform, and get recommendations based on your available time and mood.
 
 Live at **[steamloggd.vercel.app](https://steamloggd.vercel.app)**
 
@@ -8,7 +8,8 @@ Live at **[steamloggd.vercel.app](https://steamloggd.vercel.app)**
 
 ## Features
 
-- **Steam library sync** — imports your owned games and playtime via the Steam Web API
+- **OAuth sign-in** — Google, GitHub, or Discord; multiple providers with the same verified email merge into one account
+- **Optional Steam linking** — link from settings to sync your owned games and playtime via the Steam Web API
 - **IGDB enrichment** — fetches cover art, genres, and release year for every game
 - **HowLongToBeat** — pulls main-story hours so the recommender knows how long each game takes
 - **Manual game entry** — add PlayStation, Epic, or any other game by title (single or bulk up to 30 at once)
@@ -26,7 +27,7 @@ Live at **[steamloggd.vercel.app](https://steamloggd.vercel.app)**
 | Framework | Next.js 15 (App Router) + TypeScript |
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | PostgreSQL via Prisma (Docker locally, Neon in prod) |
-| Auth | Custom Steam OpenID + iron-session |
+| Auth | Auth.js (NextAuth v5) — Google / GitHub / Discord OAuth + database sessions; Steam as optional secondary link |
 | Game metadata | IGDB API (Twitch OAuth client credentials) |
 | Time-to-beat | IGDB `game_time_to_beats` endpoint |
 | Deployment | Vercel + Neon |
@@ -39,7 +40,11 @@ Live at **[steamloggd.vercel.app](https://steamloggd.vercel.app)**
 
 - Node.js 20+
 - Docker (for local Postgres)
-- Steam API key — [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey)
+- OAuth apps for at least one of the sign-in providers (callback URL is `http://localhost:3000/api/auth/callback/<provider>`):
+  - Google — [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+  - GitHub — [GitHub Developer Settings → OAuth Apps](https://github.com/settings/developers)
+  - Discord — [Discord Developer Portal](https://discord.com/developers/applications)
+- (Optional, for Steam linking) Steam API key — [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey)
 - Twitch application (for IGDB) — [dev.twitch.tv/console](https://dev.twitch.tv/console)
 
 ### Setup
@@ -56,15 +61,27 @@ Copy the env template and fill in your values:
 cp .env.local.example .env.local
 ```
 
-Required env vars:
+Required env vars (full list lives in `.env.local.example`):
 
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gamebacklog
-SESSION_PASSWORD=<at-least-32-character-random-string>
-STEAM_API_KEY=<your-steam-api-key>
-TWITCH_CLIENT_ID=<your-twitch-client-id>
-TWITCH_CLIENT_SECRET=<your-twitch-client-secret>
-NEXTAUTH_URL=http://localhost:3000
+DATABASE_URL=postgresql://gamebacklog:gamebacklog_dev@localhost:5432/gamebacklog
+AUTH_SECRET=<openssl rand -base64 32>
+AUTH_URL=http://localhost:3000
+
+# At least one provider — leave the rest blank to disable
+AUTH_GOOGLE_ID=
+AUTH_GOOGLE_SECRET=
+AUTH_GITHUB_ID=
+AUTH_GITHUB_SECRET=
+AUTH_DISCORD_ID=
+AUTH_DISCORD_SECRET=
+
+# Optional — needed only when users link Steam
+STEAM_API_KEY=
+
+# For game metadata enrichment
+TWITCH_CLIENT_ID=
+TWITCH_CLIENT_SECRET=
 ```
 
 Start Postgres and run migrations:
@@ -80,7 +97,7 @@ Start the dev server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), sign in with Steam, and sync your library.
+Open [http://localhost:3000](http://localhost:3000), sign in with your OAuth provider of choice, pick a username, and (optionally) link Steam from `/settings/connections` to sync your library.
 
 ---
 
@@ -98,8 +115,16 @@ Open [http://localhost:3000](http://localhost:3000), sign in with Steam, and syn
 src/
   app/
     api/
-      auth/steam/          # Steam OpenID login + callback
-      sync/steam/          # POST: refresh Steam library
+      auth/[...nextauth]/  # Auth.js OAuth handler (Google / GitHub / Discord)
+      auth/logout/         # POST: signs out via Auth.js
+      onboarding/          # POST: claim username + display name on first sign-in
+        check-username/    # GET: live availability check
+      steam/
+        link/start/        # GET: kick off Steam OpenID flow for current user
+        link/callback/     # GET: verify Steam, attach Account or merge legacy user
+        unlink/            # POST: remove the Steam Account row
+      settings/profile/    # PATCH: edit display name + avatar
+      sync/steam/          # POST: refresh Steam library (requires linked Steam)
       enrich/library/      # POST: IGDB + HLTB enrichment pass
       games/               # GET/POST: list + add single game
       games/[id]/          # PATCH/DELETE: update or remove a game
@@ -109,13 +134,22 @@ src/
       recommend/           # POST: { minutes, mood } → top 3 picks
     backlog/               # Full library page with filters + bulk actions
     dashboard/             # Currently playing + quick stats + sync/enrich
+    onboarding/            # First-run username + display-name form
     recommend/             # Recommender UI
+    settings/connections/  # Link/unlink OAuth providers and Steam
+    settings/profile/      # Edit display name + avatar
+  auth.ts                  # Auth.js config (providers, adapter, callbacks)
+  proxy.ts                 # Forces signed-in users with no username to /onboarding
   lib/
+    auth.ts                # requireSession / requireSteamLink helpers
     igdb/client.ts         # IGDB API wrapper (search, lookup, time-to-beat)
+    merge-user.ts          # Folds a legacy User into a new OAuth-rooted one
+    reserved-usernames.ts  # Format + reserved-name check
     steam/client.ts        # Steam Web API wrapper
+    steam-auth.ts          # Steam OpenID URL + verification (reused by link flow)
     recommender/           # Scoring function + tunable weights
     db.ts                  # Prisma client singleton
-    session.ts             # iron-session helper
+    session.ts             # Thin Auth.js wrapper exposing { userId, steamId, … }
 prisma/
-  schema.prisma            # User, Game, UserGame, SyncJob models
+  schema.prisma            # User, Account, Session, Game, UserGame, SyncJob models
 ```

@@ -1,31 +1,26 @@
-import { cookies } from "next/headers";
-import { getIronSession, type SessionOptions } from "iron-session";
+import { auth } from "@/auth";
 
 export type SessionData = {
-  userId?: string;
-  steamId?: string;
-  displayName?: string;
+  userId: string;
+  username: string | null;
+  name: string | null;
+  image: string | null;
+  steamId: string | null;
 };
 
-const password = process.env.SESSION_PASSWORD;
-if (!password || password.length < 32) {
-  throw new Error(
-    "SESSION_PASSWORD must be set and at least 32 characters. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
-  );
-}
-
-const sessionOptions: SessionOptions = {
-  cookieName: "gamebacklog_session",
-  password,
-  cookieOptions: {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-  },
-};
-
-export async function getSession() {
-  const cookieStore = await cookies();
-  return getIronSession<SessionData>(cookieStore, sessionOptions);
+/**
+ * Returns the current Auth.js session flattened into the shape the rest of
+ * the app uses, or null if no one is signed in. Replaces the iron-session
+ * helper that used to live here.
+ */
+export async function getSession(): Promise<SessionData | null> {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return {
+    userId: session.user.id,
+    username: session.user.username,
+    name: session.user.name ?? null,
+    image: session.user.image ?? null,
+    steamId: session.user.steamId,
+  };
 }

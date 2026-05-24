@@ -1,8 +1,6 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { signOut } from "@/auth";
 
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  session.destroy();
-  return NextResponse.redirect(new URL("/", req.url));
+export async function POST() {
+  // signOut() handles cookie clearing + the redirect to "/" for us.
+  await signOut({ redirectTo: "/" });
 }

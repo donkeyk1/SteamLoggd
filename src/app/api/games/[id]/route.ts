@@ -20,7 +20,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 
@@ -64,7 +64,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 

@@ -21,7 +21,7 @@ const BulkPatchSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 
@@ -73,7 +73,7 @@ const BulkDeleteSchema = z.object({
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 

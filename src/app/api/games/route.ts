@@ -22,7 +22,7 @@ const AddGameSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 
