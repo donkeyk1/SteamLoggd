@@ -21,10 +21,10 @@ const UNENRICHED_KEY = "unenriched";
 const MULTIPLAYER_KEY = "multiplayer";
 
 const SORT_OPTIONS: Record<string, Prisma.UserGameOrderByWithRelationInput[]> = {
-  recent: [{ lastPlayedAt: { sort: "desc", nulls: "last" } }, { addedAt: "desc" }],
-  playtime: [{ steamPlaytimeMinutes: { sort: "desc", nulls: "last" } }],
-  title: [{ game: { title: "asc" } }],
-  added: [{ addedAt: "desc" }],
+  recent: [{ lastPlayedAt: { sort: "desc", nulls: "last" } }, { addedAt: "desc" }, { id: "asc" }],
+  playtime: [{ steamPlaytimeMinutes: { sort: "desc", nulls: "last" } }, { id: "asc" }],
+  title: [{ game: { title: "asc" } }, { id: "asc" }],
+  added: [{ addedAt: "desc" }, { id: "asc" }],
 };
 
 export default async function BacklogPage({
