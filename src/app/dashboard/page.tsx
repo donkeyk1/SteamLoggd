@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Game, GameStatus, UserGame } from "@prisma/client";
-import { getSession } from "@/lib/session";
+import { Avatar } from "@/components/avatar";
+import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   fetchAchievementProgress,
@@ -65,8 +66,7 @@ const STATUS_STYLES: Record<
 };
 
 export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session.userId) redirect("/");
+  const session = await requireSession();
 
   const userId = session.userId;
   const steamId = session.steamId;
@@ -167,7 +167,8 @@ export default async function DashboardPage() {
   ]);
 
   if (!user) {
-    await session.destroy();
+    // Session points at a User row that no longer exists. Bounce to root;
+    // Auth.js will clear the stale session on the next request.
     redirect("/");
   }
 
@@ -214,34 +215,52 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-zinc-950 text-zinc-50">
       <header className="max-w-6xl mx-auto px-6 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {user.avatarUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.avatarUrl}
-              alt=""
-              className="w-10 h-10 rounded-full ring-2 ring-violet-500/30"
-            />
-          )}
+          <Avatar
+            steamImage={user.steamImage}
+            image={user.image}
+            name={user.name ?? user.username}
+          />
           <div>
             <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
               Signed in as
             </p>
             <p className="text-sm font-semibold text-zinc-50">
-              {user.displayName}
+              {user.name ?? user.username ?? "Anonymous"}
             </p>
           </div>
         </div>
-        <form action="/api/auth/logout" method="POST">
-          <button
-            type="submit"
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings/connections"
             className="text-sm text-zinc-500 hover:text-zinc-100 transition-colors"
           >
-            Sign out
-          </button>
-        </form>
+            Settings
+          </Link>
+          <form action="/api/auth/logout" method="POST">
+            <button
+              type="submit"
+              className="text-sm text-zinc-500 hover:text-zinc-100 transition-colors"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-6 pb-12 space-y-8">
+        {user._count.userGames === 0 && !steamId && (
+          <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 px-5 py-3 text-sm text-violet-100">
+            Already used Steamloggd before?{" "}
+            <Link
+              href="/settings/connections"
+              className="font-semibold underline hover:text-white"
+            >
+              Link your Steam account
+            </Link>{" "}
+            to recover your backlog.
+          </div>
+        )}
+
         {/* Action bar */}
         <div className="flex flex-wrap items-center gap-2">
           <Link

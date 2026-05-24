@@ -4,7 +4,7 @@ import { searchGames } from "@/lib/igdb/client";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 

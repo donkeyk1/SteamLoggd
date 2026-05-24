@@ -5,8 +5,11 @@ import { fetchOwnedGames } from "@/lib/steam/library";
 
 export async function POST() {
   const session = await getSession();
-  if (!session.userId || !session.steamId) {
+  if (!session) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+  }
+  if (!session.steamId) {
+    return NextResponse.json({ error: "steam_not_linked" }, { status: 409 });
   }
 
   const { userId, steamId } = session;
