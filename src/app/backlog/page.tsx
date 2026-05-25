@@ -89,10 +89,10 @@ export default async function BacklogPage({
 
   return (
     <main className="min-h-screen p-8 bg-zinc-50 dark:bg-zinc-950">
-      <nav className="max-w-6xl mx-auto mb-6 flex items-center gap-4 text-sm">
+      <nav className="max-w-6xl mx-auto mb-6 flex items-center gap-4 text-sm animate-fade">
         <Link
           href="/dashboard"
-          className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 transition-colors"
         >
           ← Dashboard
         </Link>
@@ -101,7 +101,7 @@ export default async function BacklogPage({
       </nav>
 
       <section className="max-w-6xl mx-auto space-y-6">
-        <div>
+        <div className="animate-in stagger-1">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
             Backlog
           </h1>
@@ -110,8 +110,11 @@ export default async function BacklogPage({
           </p>
         </div>
 
-        <AddGameForm />
+        <div className="animate-in stagger-2">
+          <AddGameForm />
+        </div>
 
+        <div className="animate-in stagger-3">
         <FilterBar
           activeStatus={statusFilter}
           isUnenriched={isUnenriched}
@@ -123,8 +126,11 @@ export default async function BacklogPage({
           unenrichedCount={unenrichedCount}
           multiplayerCount={multiplayerCount}
         />
+        </div>
 
+        <div className="animate-in stagger-4">
         <BacklogTable rows={games} showRemove={isUnenriched} />
+        </div>
 
         {games.length === 200 && (
           <p className="text-xs text-zinc-500">
