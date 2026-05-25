@@ -19,48 +19,51 @@ function formatPlaytime(minutes: number | null | undefined) {
   return `${Math.round(hours)} h`;
 }
 
-function formatHours(hours: number) {
-  if (hours < 100) return `${hours.toFixed(0)} h`;
-  return `${Math.round(hours).toLocaleString()} h`;
-}
 
 const STATUS_STYLES: Record<
   GameStatus,
-  { label: string; bar: string; pill: string }
+  { label: string; bar: string; hex: string; pill: string }
 > = {
   WISHLIST: {
     label: "Wishlist",
     bar: "bg-violet-500",
+    hex: "#8b5cf6",
     pill: "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30",
   },
   UNTRIAGED: {
     label: "Untriaged",
     bar: "bg-zinc-500",
+    hex: "#71717a",
     pill: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30",
   },
   UNPLAYED: {
     label: "Unplayed",
     bar: "bg-zinc-400",
+    hex: "#a1a1aa",
     pill: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30",
   },
   PLAYING: {
     label: "Playing",
     bar: "bg-cyan-500",
+    hex: "#06b6d4",
     pill: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30",
   },
   PAUSED: {
     label: "Paused",
     bar: "bg-amber-500",
+    hex: "#f59e0b",
     pill: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30",
   },
   BEAT: {
     label: "Beat",
     bar: "bg-emerald-500",
+    hex: "#10b981",
     pill: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30",
   },
   DROPPED: {
     label: "Dropped",
     bar: "bg-red-500",
+    hex: "#ef4444",
     pill: "bg-red-500/15 text-red-300 ring-1 ring-red-500/30",
   },
 };
@@ -80,10 +83,9 @@ export default async function DashboardPage() {
     topRated,
     recentGames,
     statusCountsRaw,
-    backlogHoursRows,
-    beatStats,
     beatThisYear,
     unenrichedCount,
+    allUserGames,
   ] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
@@ -144,25 +146,20 @@ export default async function DashboardPage() {
       where: { userId, isMultiplayer: false },
       _count: { status: true },
     }),
-    db.userGame.findMany({
-      where: {
-        userId,
-        status: { in: ["UNPLAYED", "PAUSED"] },
-        isMultiplayer: false,
-        OR: [{ platform: null }, { platform: { not: "Wishlist" } }],
-        game: { hltbMainHours: { gt: 0 } },
-      },
-      select: { game: { select: { hltbMainHours: true } } },
-    }),
-    db.userGame.aggregate({
-      where: { userId, status: "BEAT", rating: { not: null } },
-      _avg: { rating: true },
-    }),
     db.userGame.count({
       where: { userId, status: "BEAT", finishedAt: { gte: yearStart } },
     }),
     db.userGame.count({
       where: { userId, source: "STEAM", game: { igdbId: null } },
+    }),
+    db.userGame.findMany({
+      where: { userId },
+      select: {
+        status: true,
+        steamPlaytimeMinutes: true,
+        manualPlaytimeMinutes: true,
+        game: { select: { genres: true } },
+      },
     }),
   ]);
 
@@ -172,11 +169,33 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const backlogHoursTotal = backlogHoursRows.reduce(
-    (sum, r) => sum + (r.game.hltbMainHours ?? 0),
-    0
-  );
-  const avgRating = beatStats._avg.rating ?? 0;
+  // Compute top 3 genres weighted by playtime + beaten status
+  const genreStats = new Map<string, { hours: number; beaten: number }>();
+  for (const row of allUserGames) {
+    const mins = (row.steamPlaytimeMinutes ?? 0) + (row.manualPlaytimeMinutes ?? 0);
+    const hours = mins / 60;
+    const isBeat = row.status === "BEAT";
+    for (const genre of row.game.genres) {
+      const prev = genreStats.get(genre) ?? { hours: 0, beaten: 0 };
+      genreStats.set(genre, {
+        hours: prev.hours + hours,
+        beaten: prev.beaten + (isBeat ? 1 : 0),
+      });
+    }
+  }
+  const topGenres = [...genreStats.entries()]
+    .map(([genre, stats]) => ({
+      genre,
+      hours: stats.hours,
+      beaten: stats.beaten,
+      score: stats.hours + stats.beaten * 10,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  const totalSP = statusCountsRaw.reduce((sum, r) => sum + r._count.status, 0);
+  const beatCount = statusCountsRaw.find((r) => r.status === "BEAT")?._count.status ?? 0;
+  const completionPct = totalSP > 0 ? Math.round((beatCount / totalSP) * 100) : 0;
 
   const statusCounts: Record<GameStatus, number> = {
     WISHLIST: 0,
@@ -213,7 +232,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-50">
-      <header className="max-w-6xl mx-auto px-6 pt-6 pb-4 flex items-center justify-between">
+      <header className="max-w-6xl mx-auto px-6 pt-6 pb-4 flex items-center justify-between animate-fade">
         <div className="flex items-center gap-3">
           <Avatar
             steamImage={user.steamImage}
@@ -262,16 +281,16 @@ export default async function DashboardPage() {
         )}
 
         {/* Action bar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 animate-in stagger-1">
           <Link
             href="/recommend"
-            className="text-sm rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 transition-all px-4 py-2 font-semibold text-white shadow-lg shadow-violet-500/20"
+            className="text-sm rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 px-4 py-2 font-semibold text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 btn-press"
           >
             ✨ What should I play?
           </Link>
           <Link
             href="/backlog"
-            className="text-sm rounded-lg border border-zinc-800 hover:bg-zinc-900 transition-colors px-4 py-2 text-zinc-300"
+            className="text-sm rounded-lg border border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 px-4 py-2 text-zinc-300 btn-press"
           >
             Full backlog →
           </Link>
@@ -285,7 +304,7 @@ export default async function DashboardPage() {
 
         {/* NOW PLAYING hero */}
         {playingGames.length > 0 && (
-          <section className="space-y-3">
+          <section className="space-y-3 animate-in stagger-2">
             <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
               Now Playing
             </h2>
@@ -308,7 +327,7 @@ export default async function DashboardPage() {
         )}
 
         {/* Stat cards */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-in stagger-3">
           <StatCard
             value={user._count.userGames.toLocaleString()}
             label="Games tracked"
@@ -319,28 +338,20 @@ export default async function DashboardPage() {
             label={`Beat in ${currentYear}`}
             accent="emerald"
           />
-          <StatCard
-            value={formatHours(backlogHoursTotal)}
-            label="Backlog hours"
-            accent="cyan"
-          />
-          <StatCard
-            value={avgRating > 0 ? `${avgRating.toFixed(1)}/5` : "—"}
-            label="Avg rating"
-            accent="amber"
-          />
+          <CompletionCard pct={completionPct} beaten={beatCount} total={totalSP} />
+          <TopGenresCard genres={topGenres.map((g) => ({ name: g.genre, hours: g.hours, beaten: g.beaten }))} />
         </section>
 
         {/* Top picks + Status breakdown */}
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50 backdrop-blur p-5">
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-in stagger-4">
+          <div className="lg:col-span-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 backdrop-blur p-5 card-hover">
             <div className="flex items-baseline justify-between mb-4">
               <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
                 Top picks for you
               </h2>
               <Link
                 href="/recommend"
-                className="text-xs text-violet-400 hover:text-violet-300"
+                className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
               >
                 Customize →
               </Link>
@@ -358,32 +369,35 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          <div className="lg:col-span-2 rounded-xl bg-zinc-900/50 border border-zinc-800/50 backdrop-blur p-5">
+          <div className="lg:col-span-2 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 backdrop-blur p-5 card-hover">
             <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-4">
               By status
             </h2>
-            <div className="space-y-2.5">
-              {(Object.keys(STATUS_STYLES) as GameStatus[]).map((status) => {
-                const count = statusCounts[status];
-                const pct = statusTotal > 0 ? (count / statusTotal) * 100 : 0;
-                const style = STATUS_STYLES[status];
-                return (
-                  <div key={status} className="flex items-center gap-2 text-sm">
-                    <span className="w-20 text-xs text-zinc-400">
-                      {style.label}
-                    </span>
-                    <div className="flex-1 h-2 bg-zinc-800/70 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${style.bar} transition-all`}
-                        style={{ width: `${pct}%` }}
-                      />
+
+            <div className="flex items-center gap-5">
+              {/* Donut chart */}
+              <DonutChart statusCounts={statusCounts} total={statusTotal} />
+
+              {/* Legend */}
+              <div className="flex-1 space-y-1.5">
+                {(Object.keys(STATUS_STYLES) as GameStatus[])
+                  .sort((a, b) => statusCounts[b] - statusCounts[a])
+                  .map((status) => {
+                  const count = statusCounts[status];
+                  const style = STATUS_STYLES[status];
+                  return (
+                    <div key={status} className="flex items-center gap-2 text-sm">
+                      <span className={`w-2 h-2 rounded-full ${style.bar} shrink-0`} />
+                      <span className="flex-1 text-xs text-zinc-400">
+                        {style.label}
+                      </span>
+                      <span className="text-xs text-zinc-500 tabular-nums">
+                        {count}
+                      </span>
                     </div>
-                    <span className="w-8 text-xs text-right text-zinc-500 tabular-nums">
-                      {count}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
             <p className="text-[10px] text-zinc-600 mt-3">
               Single-player only · multiplayer tracked separately
@@ -393,7 +407,7 @@ export default async function DashboardPage() {
 
         {/* Hall of Fame */}
         {topRated.length > 0 && (
-          <section className="space-y-3">
+          <section className="space-y-3 animate-in stagger-5">
             <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
               Hall of Fame · highest-rated games
             </h2>
@@ -401,7 +415,7 @@ export default async function DashboardPage() {
               {topRated.map((row) => (
                 <div
                   key={row.id}
-                  className="aspect-[3/4] rounded-md overflow-hidden relative group ring-1 ring-zinc-800/50 hover:ring-violet-500/60 transition-all hover:scale-105"
+                  className="aspect-[3/4] rounded-md overflow-hidden relative group ring-1 ring-zinc-800/50 hover:ring-violet-500/60 transition-all duration-200 hover:scale-110 hover:z-10 hover:shadow-lg hover:shadow-violet-500/20"
                   title={`${row.game.title} · ${row.rating}/5`}
                 >
                   {row.game.coverUrl && (
@@ -428,61 +442,57 @@ export default async function DashboardPage() {
 
         {/* Recent activity */}
         {recentGames.length > 0 && (
-          <section className="space-y-3">
+          <section className="space-y-3 animate-in stagger-6">
             <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
               Recent activity
             </h2>
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/50 backdrop-blur overflow-hidden">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-zinc-800/50">
-                  {recentGames.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-zinc-900/70 transition-colors"
-                    >
-                      <td className="pl-4 py-2 w-10">
-                        {row.game.coverUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={row.game.coverUrl}
-                            alt=""
-                            className="w-7 h-10 object-cover rounded"
-                          />
-                        ) : (
-                          <div className="w-7 h-10 rounded bg-zinc-800" />
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-zinc-100">
-                        {row.game.title}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${
-                              STATUS_STYLES[row.status].pill
-                            }`}
-                          >
-                            {STATUS_STYLES[row.status].label}
-                          </span>
-                          {row.isMultiplayer && (
-                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30">
-                              MP
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-right text-zinc-400 tabular-nums">
-                        {formatPlaytime(row.steamPlaytimeMinutes)}
-                      </td>
-                      <td className="px-3 py-2 pr-4 text-right text-zinc-500 tabular-nums">
-                        {row.lastPlayedAt
-                          ? row.lastPlayedAt.toLocaleDateString()
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              {recentGames.map((row) => (
+                <div
+                  key={row.id}
+                  className="group rounded-xl bg-zinc-900/50 border border-zinc-800/50 backdrop-blur p-3 flex items-center gap-4 hover:bg-zinc-800/50 hover:border-zinc-700/50 card-hover"
+                >
+                  {row.game.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={row.game.coverUrl}
+                      alt=""
+                      className="w-10 h-14 object-cover rounded-md shadow-md shadow-black/30 shrink-0 group-hover:shadow-lg group-hover:shadow-black/40 transition-shadow"
+                    />
+                  ) : (
+                    <div className="w-10 h-14 rounded-md bg-zinc-800 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-100 truncate">
+                      {row.game.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span
+                        className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${
+                          STATUS_STYLES[row.status].pill
+                        }`}
+                      >
+                        {STATUS_STYLES[row.status].label}
+                      </span>
+                      {row.isMultiplayer && (
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30">
+                          MP
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm text-zinc-400 tabular-nums">
+                      {formatPlaytime(row.steamPlaytimeMinutes)}
+                    </p>
+                    <p className="text-xs text-zinc-600 tabular-nums">
+                      {row.lastPlayedAt
+                        ? row.lastPlayedAt.toLocaleDateString()
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
             <Link
               href="/backlog"
@@ -515,7 +525,7 @@ function StatCard({
 
   return (
     <div
-      className={`rounded-xl bg-gradient-to-br ${accentClass} to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5`}
+      className={`rounded-xl bg-gradient-to-br ${accentClass} to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover`}
     >
       <div className="text-2xl md:text-3xl font-bold text-zinc-50 tabular-nums">
         {value}
@@ -523,6 +533,149 @@ function StatCard({
       <div className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1 font-bold">
         {label}
       </div>
+    </div>
+  );
+}
+
+function CompletionCard({
+  pct,
+  beaten,
+  total,
+}: {
+  pct: number;
+  beaten: number;
+  total: number;
+}) {
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-cyan-500/15 to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover">
+      <div className="flex items-end gap-2">
+        <div className="text-2xl md:text-3xl font-bold text-zinc-50 tabular-nums">
+          {pct}%
+        </div>
+        <span className="text-xs text-zinc-500 mb-1 tabular-nums">
+          {beaten}/{total}
+        </span>
+      </div>
+      <div className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1 font-bold">
+        Completion rate
+      </div>
+      <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DonutChart({
+  statusCounts,
+  total,
+}: {
+  statusCounts: Record<GameStatus, number>;
+  total: number;
+}) {
+  const displaySize = 120;
+  const scale = 3;
+  const size = displaySize * scale;
+  const strokeWidth = 14 * scale;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const gap = 4 * scale;
+
+  const activeStatuses = (Object.keys(STATUS_STYLES) as GameStatus[]).filter(
+    (s) => statusCounts[s] > 0
+  );
+  const totalGap = activeStatuses.length > 1 ? gap * activeStatuses.length : 0;
+  const usable = circumference - totalGap;
+
+  let offset = 0;
+  const segments = activeStatuses.map((status) => {
+    const pct = statusCounts[status] / total;
+    const dashLength = pct * usable;
+    const seg = { status, dashLength, offset, hex: STATUS_STYLES[status].hex };
+    offset += dashLength + gap;
+    return seg;
+  });
+
+  return (
+    <div className="relative shrink-0" style={{ width: displaySize, height: displaySize }}>
+      <svg
+        width={displaySize}
+        height={displaySize}
+        viewBox={`0 0 ${size} ${size}`}
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#27272a"
+          strokeWidth={strokeWidth}
+        />
+        {segments.map((seg) => (
+          <circle
+            key={seg.status}
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={seg.hex}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${seg.dashLength} ${circumference - seg.dashLength}`}
+            strokeDashoffset={-seg.offset}
+            strokeLinecap="butt"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        ))}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold text-zinc-50 tabular-nums leading-none">
+          {total}
+        </span>
+        <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0.5">
+          games
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TopGenresCard({
+  genres,
+}: {
+  genres: { name: string; hours: number; beaten: number }[];
+}) {
+  const medals = ["text-amber-400", "text-zinc-400", "text-amber-700"];
+  const medalLabels = ["1st", "2nd", "3rd"];
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-amber-500/15 to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover">
+      <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2">
+        Top genres
+      </div>
+      {genres.length === 0 ? (
+        <p className="text-sm text-zinc-600">No genre data yet</p>
+      ) : (
+        <div className="space-y-1.5">
+          {genres.map((g, i) => (
+            <div key={g.name} className="flex items-center gap-2">
+              <span
+                className={`text-xs font-bold w-7 shrink-0 ${medals[i] ?? "text-zinc-600"}`}
+              >
+                {medalLabels[i]}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-zinc-200 truncate block">{g.name}</span>
+                <span className="text-[10px] text-zinc-500 tabular-nums">
+                  {g.hours < 1 ? "<1" : Math.round(g.hours)}h played
+                  {g.beaten > 0 && ` · ${g.beaten} beaten`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -545,7 +698,7 @@ function NowPlayingCard({
       : null;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl ring-1 ring-zinc-800/50 bg-zinc-900">
+    <div className="relative overflow-hidden rounded-2xl ring-1 ring-zinc-800/50 hover:ring-cyan-500/30 bg-zinc-900 card-hover">
       {game.coverUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -635,8 +788,8 @@ function TopPickRow({
   why: string;
 }) {
   return (
-    <div className="flex gap-3 items-center">
-      <span className="w-5 text-lg font-bold text-zinc-700 tabular-nums shrink-0">
+    <div className="flex gap-3 items-center rounded-lg px-2 py-1.5 -mx-2 hover:bg-zinc-800/50 transition-all duration-200 group">
+      <span className="w-5 text-lg font-bold text-zinc-700 tabular-nums shrink-0 group-hover:text-zinc-500 transition-colors">
         {rank}
       </span>
       {row.game.coverUrl ? (
@@ -644,7 +797,7 @@ function TopPickRow({
         <img
           src={row.game.coverUrl}
           alt=""
-          className="w-9 h-12 object-cover rounded shrink-0"
+          className="w-9 h-12 object-cover rounded shrink-0 group-hover:shadow-md group-hover:shadow-black/40 transition-shadow"
         />
       ) : (
         <div className="w-9 h-12 rounded bg-zinc-800 shrink-0" />
