@@ -18,6 +18,6 @@ export async function requireSession(): Promise<SessionData> {
  */
 export async function requireSteamLink(): Promise<SessionData & { steamId: string }> {
   const session = await requireSession();
-  if (!session.steamId) redirect("/settings/connections?error=steam_not_linked");
+  if (!session.steamId) redirect("/settings/profile?error=steam_not_linked");
   return session as SessionData & { steamId: string };
 }

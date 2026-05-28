@@ -4,24 +4,53 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Game, GameStatus, UserGame } from "@prisma/client";
 import { PLATFORMS } from "@/lib/platforms";
+import { GameCover } from "@/components/ui/game-cover";
+import { StatusPill } from "@/components/ui/status-pill";
+import { StarIcon } from "@/components/ui/icons";
 
 type Row = UserGame & { game: Game };
 
 const STATUS_OPTIONS: GameStatus[] = [
-  "WISHLIST",
-  "UNTRIAGED",
-  "UNPLAYED",
-  "PLAYING",
-  "PAUSED",
-  "BEAT",
-  "DROPPED",
+  "WISHLIST", "UNTRIAGED", "UNPLAYED", "PLAYING", "PAUSED", "BEAT", "DROPPED",
 ];
 
 function formatPlaytime(minutes: number | null | undefined) {
   if (!minutes) return "—";
   const hours = minutes / 60;
-  if (hours < 10) return `${hours.toFixed(1)} h`;
-  return `${Math.round(hours)} h`;
+  if (hours < 10) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours)}h`;
+}
+
+function PriorityChip({ level }: { level: number }) {
+  const map: Record<number, { dots: number; color: string; label: string }> = {
+    5: { dots: 3, color: "var(--hf-amber)", label: "High" },
+    4: { dots: 3, color: "var(--hf-amber)", label: "High" },
+    3: { dots: 2, color: "var(--hf-fg-muted)", label: "Med" },
+    2: { dots: 1, color: "var(--hf-fg-dim)", label: "Low" },
+    1: { dots: 1, color: "var(--hf-fg-dim)", label: "Low" },
+  };
+  const it = map[level] || map[3];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex gap-0.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 4,
+              height: 9,
+              borderRadius: 1,
+              background: i < it.dots ? it.color : "var(--hf-fg-faint)",
+              opacity: i < it.dots ? 1 : 0.3,
+            }}
+          />
+        ))}
+      </span>
+      <span className="hf-mono" style={{ fontSize: 10.5, color: it.color, letterSpacing: "0.04em" }}>
+        {it.label}
+      </span>
+    </span>
+  );
 }
 
 export function BacklogTable({
@@ -128,323 +157,275 @@ export function BacklogTable({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <div
+        className="flex items-center justify-center"
+        style={{
+          borderRadius: 14,
+          border: "1.5px dashed var(--hf-fg-faint)",
+          padding: "48px 20px",
+          color: "var(--hf-fg-dim)",
+          fontSize: 14,
+        }}
+      >
         No games match these filters.
       </div>
     );
   }
 
+  const selectStyle = "hf-mono bg-zinc-900 border border-zinc-700 text-zinc-50 rounded px-2 py-1 text-[11px] disabled:opacity-50 cursor-pointer";
+
+  const GRID = "32px 52px minmax(0,2.4fr) 100px 130px 80px minmax(0,1fr) 80px 70px 70px";
+
   return (
-    <div className="space-y-2">
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+    <div className="flex flex-col gap-2 h-full">
+      {error && <p className="hf-mono" style={{ fontSize: 11, color: "var(--hf-rose)" }}>{error}</p>}
+
+      {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="sticky top-2 z-20 rounded-lg border border-violet-400 dark:border-violet-600 bg-violet-50 dark:bg-violet-950/80 backdrop-blur p-2.5 flex flex-wrap items-center gap-2 shadow-lg">
-          <span className="text-sm font-medium text-violet-900 dark:text-violet-100 px-1">
+        <div
+          className="sticky top-2 z-20 flex flex-wrap items-center gap-2 shadow-lg"
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(139,92,246,0.4)",
+            background: "rgba(139,92,246,0.08)",
+            backdropFilter: "blur(8px)",
+            padding: "8px 12px",
+          }}
+        >
+          <span className="hf-mono" style={{ fontSize: 12, color: "var(--hf-violet-soft)", fontWeight: 600, paddingRight: 4 }}>
             {selected.size} selected
           </span>
-          <select
-            disabled={bulkBusy}
-            defaultValue=""
-            onChange={(e) => {
-              if (!e.target.value) return;
-              bulkPatch({ status: e.target.value as GameStatus });
-              e.target.value = "";
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-          >
+          <select disabled={bulkBusy} defaultValue="" onChange={(e) => { if (e.target.value) { bulkPatch({ status: e.target.value as GameStatus }); e.target.value = ""; } }} className={selectStyle}>
             <option value="">Set status…</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s.toLowerCase()}</option>
-            ))}
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.toLowerCase()}</option>)}
           </select>
-          <select
-            disabled={bulkBusy}
-            defaultValue=""
-            onChange={(e) => {
-              if (!e.target.value) return;
-              bulkPatch({ priority: Number(e.target.value) });
-              e.target.value = "";
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-          >
+          <select disabled={bulkBusy} defaultValue="" onChange={(e) => { if (e.target.value) { bulkPatch({ priority: Number(e.target.value) }); e.target.value = ""; } }} className={selectStyle}>
             <option value="">Set priority…</option>
-            {[1, 2, 3, 4, 5].map((p) => (
-              <option key={p} value={p}>P{p}</option>
-            ))}
+            <option value={5}>High</option>
+            <option value={3}>Medium</option>
+            <option value={1}>Low</option>
           </select>
           {allSelectedFinished && (
-            <select
-              disabled={bulkBusy}
-              defaultValue=""
-              onChange={(e) => {
-                if (!e.target.value) return;
-                bulkPatch({ rating: Number(e.target.value) });
-                e.target.value = "";
-              }}
-              className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-            >
+            <select disabled={bulkBusy} defaultValue="" onChange={(e) => { if (e.target.value) { bulkPatch({ rating: Number(e.target.value) }); e.target.value = ""; } }} className={selectStyle}>
               <option value="">Set rating…</option>
-              {[1, 2, 3, 4, 5].map((r) => (
-                <option key={r} value={r}>
-                  {"★".repeat(r)}{"☆".repeat(5 - r)}
-                </option>
-              ))}
+              {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{"★".repeat(r)}{"☆".repeat(5 - r)}</option>)}
             </select>
           )}
-          <button
-            type="button"
-            disabled={bulkBusy}
-            onClick={() => bulkPatch({ isMultiplayer: true })}
-            className="px-2 py-1 text-xs rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950 disabled:opacity-50"
-          >
-            Mark MP
-          </button>
-          <button
-            type="button"
-            disabled={bulkBusy}
-            onClick={() => bulkPatch({ isMultiplayer: false })}
-            className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
-          >
-            Unmark MP
-          </button>
-          <button
-            type="button"
-            disabled={bulkBusy}
-            onClick={bulkDelete}
-            className="px-2 py-1 text-xs rounded-md border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 disabled:opacity-50"
-          >
-            Remove
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="ml-auto px-2 py-1 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"
-          >
-            Clear
-          </button>
+          <button type="button" disabled={bulkBusy} onClick={bulkDelete} className="hf-btn hf-btn-ghost btn-press" style={{ fontSize: 11, padding: "4px 8px", color: "var(--hf-rose)" }}>Remove</button>
+          <button type="button" onClick={() => setSelected(new Set())} className="hf-btn hf-btn-ghost btn-press ml-auto" style={{ fontSize: 11, padding: "4px 8px" }}>Clear</button>
         </div>
       )}
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400">
-            <tr>
-              <th className="px-3 py-2 w-8">
+
+      {/* Table */}
+      <div
+        className="flex flex-col flex-1 min-h-0 overflow-hidden"
+        style={{
+          borderRadius: 14,
+          border: "1px solid var(--hf-border-soft)",
+          background: "rgba(255,255,255,0.015)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="grid items-center"
+          style={{
+            gridTemplateColumns: GRID,
+            padding: "11px 18px",
+            borderBottom: "1px solid var(--hf-border-soft)",
+            background: "rgba(255,255,255,0.02)",
+          }}
+        >
+          <div style={{ paddingLeft: 2 }}>
+            <input
+              type="checkbox"
+              checked={rows.length > 0 && selected.size === rows.length}
+              ref={(el) => { if (el) el.indeterminate = selected.size > 0 && selected.size < rows.length; }}
+              onChange={toggleAll}
+              className="accent-violet-500 cursor-pointer"
+              aria-label="Select all"
+            />
+          </div>
+          {["", "TITLE", "STATUS", "RATING / PRIORITY", "PLAYTIME", "GENRE", "PLATFORM", "MODE", ""].map((h, i) => (
+            <span key={i} className="hf-cap">{h}</span>
+          ))}
+        </div>
+
+        {/* Rows */}
+        <div className="flex-1 overflow-y-auto hf-scroll">
+          {rows.map((row, i) => (
+            <div
+              key={row.id}
+              className="grid items-center table-row-hover cursor-pointer"
+              onClick={(e) => {
+                // Don't toggle selection when clicking interactive elements (selects, buttons, inputs, links)
+                const tag = (e.target as HTMLElement).tagName;
+                if (tag === "SELECT" || tag === "OPTION" || tag === "BUTTON" || tag === "INPUT" || tag === "A") return;
+                toggle(row.id);
+              }}
+              style={{
+                gridTemplateColumns: GRID,
+                padding: "8px 18px",
+                borderBottom: i < rows.length - 1 ? "1px solid var(--hf-border-soft)" : "none",
+                background: selected.has(row.id)
+                  ? "rgba(139,92,246,0.06)"
+                  : row.status === "PLAYING"
+                    ? "rgba(34,211,238,0.04)"
+                    : "transparent",
+              }}
+            >
+              {/* Checkbox */}
+              <div style={{ paddingLeft: 2 }}>
                 <input
                   type="checkbox"
-                  checked={rows.length > 0 && selected.size === rows.length}
-                  ref={(el) => {
-                    if (el) el.indeterminate = selected.size > 0 && selected.size < rows.length;
-                  }}
-                  onChange={toggleAll}
+                  checked={selected.has(row.id)}
+                  onChange={() => toggle(row.id)}
                   className="accent-violet-500 cursor-pointer"
-                  aria-label="Select all"
+                  aria-label={`Select ${row.game.title}`}
                 />
-              </th>
-              <th className="font-medium px-4 py-2 w-14"></th>
-              <th className="text-left font-medium px-4 py-2">Game</th>
-              <th className="text-left font-medium px-4 py-2 w-40">Status</th>
-              <th className="text-center font-medium px-4 py-2 w-32">Priority / Rating</th>
-              <th className="text-right font-medium px-4 py-2 w-24">Playtime</th>
-              <th className="text-right font-medium px-4 py-2 w-24">HLTB</th>
-              <th className="text-right font-medium px-4 py-2 w-32">Last played</th>
-              <th className="text-left font-medium px-4 py-2 w-32">Platform</th>
-              <th className="px-3 py-2 w-12" title="Multiplayer"></th>
-              {showRemove && <th className="px-4 py-2 w-20"></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                className={`${
-                  selected.has(row.id)
-                    ? "bg-violet-50 dark:bg-violet-950/30"
-                    : "bg-white dark:bg-zinc-950"
-                }`}
-              >
-                <td className="px-3 py-1">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.id)}
-                    onChange={() => toggle(row.id)}
-                    className="accent-violet-500 cursor-pointer"
-                    aria-label={`Select ${row.game.title}`}
-                  />
-                </td>
-                <td className="pl-4 py-1">
-                  {row.game.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={row.game.coverUrl}
-                      alt=""
-                      className="w-8 h-11 object-cover rounded"
-                    />
-                  ) : (
-                    <div className="w-8 h-11 rounded bg-zinc-200 dark:bg-zinc-800" />
-                  )}
-                </td>
-                <td className="px-4 py-2 text-zinc-900 dark:text-zinc-50">
-                  <div>{row.game.title}</div>
-                  {row.game.releaseYear && (
-                    <div className="text-xs text-zinc-500">
-                      {row.game.releaseYear}
+              </div>
+
+              {/* Cover */}
+              <GameCover name={row.game.title} coverUrl={row.game.coverUrl} w={36} h={50} radius={4} />
+
+              {/* Title */}
+              <div style={{ minWidth: 0, paddingRight: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {row.game.title}
+                </div>
+                <div className="hf-mono" style={{ fontSize: 11.5, color: "var(--hf-fg-dim)", marginTop: 2 }}>
+                  {row.lastPlayedAt ? `last ${row.lastPlayedAt.toLocaleDateString()}` : row.game.releaseYear ? `${row.game.releaseYear}` : "never played"}
+                </div>
+              </div>
+
+              {/* Status — clickable pill only */}
+              <div className="relative inline-edit-hover">
+                <StatusPill status={row.status} />
+                <select
+                  value={row.status}
+                  disabled={savingId === row.id}
+                  onChange={(e) => patch(row.id, { status: e.target.value as GameStatus })}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                  style={{ width: "100%", height: "100%" }}
+                  title="Change status"
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s} className="bg-zinc-900 text-zinc-50">{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Rating / Priority — clickable */}
+              <div className="relative inline-edit-hover">
+                {(row.status === "BEAT" || row.status === "DROPPED") ? (
+                  <>
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <StarIcon key={j} size={11} color={j < (row.rating ?? 0) ? "var(--hf-amber)" : "var(--hf-fg-faint)"} filled={j < (row.rating ?? 0)} />
+                      ))}
                     </div>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={row.status}
-                    disabled={savingId === row.id}
-                    onChange={(e) =>
-                      patch(row.id, { status: e.target.value as GameStatus })
-                    }
-                    className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s.toLowerCase()}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  {row.status === "BEAT" || row.status === "DROPPED" ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <select
-                        value={row.rating ?? ""}
-                        disabled={savingId === row.id}
-                        onChange={(e) =>
-                          patch(row.id, {
-                            rating: e.target.value ? Number(e.target.value) : null,
-                          })
-                        }
-                        className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-                        title="Your rating (1–5)"
-                      >
-                        <option value="">— rate</option>
-                        {[1, 2, 3, 4, 5].map((r) => (
-                          <option key={r} value={r}>
-                            {"★".repeat(r)}{"☆".repeat(5 - r)}
-                          </option>
-                        ))}
-                      </select>
-                      {row.status === "BEAT" && (
-                        <button
-                          onClick={() =>
-                            patch(row.id, { wantReplay: !row.wantReplay })
-                          }
-                          disabled={savingId === row.id}
-                          title={
-                            row.wantReplay
-                              ? "In recommendations — click to remove"
-                              : "Mark for replay (adds to recommendations)"
-                          }
-                          className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors disabled:opacity-50 ${
-                            row.wantReplay
-                              ? "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30"
-                              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                          }`}
-                        >
-                          ↻ {row.wantReplay ? "replay" : "replay?"}
-                        </button>
-                      )}
-                      {row.status === "BEAT" && row.wantReplay && (
-                        <select
-                          value={row.priority}
-                          disabled={savingId === row.id}
-                          onChange={(e) =>
-                            patch(row.id, { priority: Number(e.target.value) })
-                          }
-                          className="px-2 py-0.5 text-[10px] rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-                          title="Replay priority (1 = lowest, 5 = highest)"
-                        >
-                          {[1, 2, 3, 4, 5].map((p) => (
-                            <option key={p} value={p}>P{p}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex justify-center">
-                      <select
-                        value={row.priority}
-                        disabled={savingId === row.id}
-                        onChange={(e) =>
-                          patch(row.id, { priority: Number(e.target.value) })
-                        }
-                        className="px-2 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 disabled:opacity-50"
-                        title="Priority (1 = lowest, 5 = highest)"
-                      >
-                        {[1, 2, 3, 4, 5].map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-right text-zinc-600 dark:text-zinc-400">
-                  {formatPlaytime(row.steamPlaytimeMinutes)}
-                </td>
-                <td className="px-4 py-2 text-right text-zinc-600 dark:text-zinc-400">
-                  {row.game.hltbMainHours && row.game.hltbMainHours > 0
-                    ? `${row.game.hltbMainHours.toFixed(0)} h`
-                    : "—"}
-                </td>
-                <td className="px-4 py-2 text-right text-zinc-600 dark:text-zinc-400">
-                  {row.lastPlayedAt
-                    ? row.lastPlayedAt.toLocaleDateString()
-                    : "—"}
-                </td>
-                <td className="px-4 py-2 text-xs">
-                  {row.source === "STEAM" ? (
-                    <span className="text-zinc-500 dark:text-zinc-500">Steam</span>
-                  ) : (
                     <select
-                      value={row.platform ?? ""}
+                      value={row.rating ?? ""}
                       disabled={savingId === row.id}
-                      onChange={(e) =>
-                        patch(row.id, { platform: e.target.value || null })
-                      }
-                      className="px-1.5 py-0.5 text-xs rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 disabled:opacity-50"
+                      onChange={(e) => patch(row.id, { rating: e.target.value ? Number(e.target.value) : null })}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                      style={{ width: "100%", height: "100%" }}
+                      title="Change rating"
                     >
-                      <option value="">— platform</option>
-                      {PLATFORMS.map((p) => (
-                        <option key={p} value={p}>{p}</option>
+                      <option value="" className="bg-zinc-900">No rating</option>
+                      {[1, 2, 3, 4, 5].map((r) => (
+                        <option key={r} value={r} className="bg-zinc-900">{"★".repeat(r)}{"☆".repeat(5 - r)}</option>
                       ))}
                     </select>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <button
-                    onClick={() => patch(row.id, { isMultiplayer: !row.isMultiplayer })}
-                    disabled={savingId === row.id}
-                    title={row.isMultiplayer ? "Multiplayer — click to move to single-player" : "Mark as multiplayer"}
-                    className={`px-1.5 py-0.5 text-xs rounded font-medium transition-colors disabled:opacity-50 ${
-                      row.isMultiplayer
-                        ? "bg-blue-100 text-blue-700 border border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700"
-                        : "text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400"
-                    }`}
-                  >
-                    MP
-                  </button>
-                </td>
-                {showRemove && (
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => remove(row.id)}
+                  </>
+                ) : (
+                  <>
+                    <PriorityChip level={row.priority} />
+                    <select
+                      value={row.priority >= 4 ? 5 : row.priority >= 3 ? 3 : 1}
                       disabled={savingId === row.id}
-                      className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 disabled:opacity-50"
+                      onChange={(e) => patch(row.id, { priority: Number(e.target.value) })}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                      style={{ width: "100%", height: "100%" }}
+                      title="Change priority"
                     >
-                      Remove
-                    </button>
-                  </td>
+                      <option value={5} className="bg-zinc-900">High</option>
+                      <option value={3} className="bg-zinc-900">Medium</option>
+                      <option value={1} className="bg-zinc-900">Low</option>
+                    </select>
+                  </>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+
+              {/* Playtime */}
+              <span className="hf-mono" style={{ fontSize: 12.5, color: row.steamPlaytimeMinutes ? "var(--hf-fg)" : "var(--hf-fg-faint)", fontVariantNumeric: "tabular-nums" }}>
+                {formatPlaytime(row.steamPlaytimeMinutes)}
+              </span>
+
+              {/* Genre */}
+              <span style={{ fontSize: 12.5, color: "var(--hf-fg-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 8 }}>
+                {row.game.genres?.slice(0, 2).join(" · ") || "—"}
+              </span>
+
+              {/* Platform */}
+              <span className="hf-mono" style={{ fontSize: 11.5, color: "var(--hf-fg-dim)" }}>
+                {row.source === "STEAM" ? "Steam" : row.platform || "—"}
+              </span>
+
+              {/* Mode (SP/MP) — clickable */}
+              <div className="relative inline-edit-hover">
+                <span
+                  className="hf-mono"
+                  style={{
+                    fontSize: 10.5,
+                    letterSpacing: "0.04em",
+                    color: row.isMultiplayer ? "var(--hf-cyan)" : "var(--hf-fg-dim)",
+                  }}
+                >
+                  {row.isMultiplayer ? "MP" : "SP"}
+                </span>
+                <select
+                  value={row.isMultiplayer ? "mp" : "sp"}
+                  disabled={savingId === row.id}
+                  onChange={(e) => patch(row.id, { isMultiplayer: e.target.value === "mp" })}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                  style={{ width: "100%", height: "100%" }}
+                  title="Change mode"
+                >
+                  <option value="sp" className="bg-zinc-900">Single-player</option>
+                  <option value="mp" className="bg-zinc-900">Multiplayer</option>
+                </select>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-1 justify-end">
+                {showRemove && (
+                  <button
+                    onClick={() => remove(row.id)}
+                    disabled={savingId === row.id}
+                    className="hf-btn hf-btn-ghost btn-press"
+                    style={{ padding: "4px 8px", fontSize: 11.5, color: "var(--hf-rose)" }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div
+          className="flex justify-between items-center"
+          style={{
+            padding: "10px 18px",
+            borderTop: "1px solid var(--hf-border-soft)",
+            background: "rgba(255,255,255,0.015)",
+          }}
+        >
+          <span className="hf-mono" style={{ fontSize: 11.5, color: "var(--hf-fg-dim)" }}>
+            showing {rows.length} game{rows.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
     </div>
   );

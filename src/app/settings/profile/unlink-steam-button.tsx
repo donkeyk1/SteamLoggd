@@ -22,7 +22,7 @@ export function UnlinkSteamButton() {
     return (
       <button
         onClick={() => setConfirm(true)}
-        className="shrink-0 text-xs text-zinc-500 hover:text-red-500 transition-colors"
+        style={{ fontSize: 12, color: "var(--hf-fg-dim)", cursor: "pointer", background: "none", border: "none" }}
       >
         Unlink
       </button>
@@ -33,14 +33,16 @@ export function UnlinkSteamButton() {
     <div className="flex items-center gap-2 shrink-0">
       <button
         onClick={() => setConfirm(false)}
-        className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+        className="hf-btn hf-btn-ghost"
+        style={{ fontSize: 12, padding: "4px 8px" }}
       >
         Cancel
       </button>
       <button
         onClick={unlink}
         disabled={pending}
-        className="rounded-md bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 px-3 py-1.5 text-xs text-white font-medium"
+        className="hf-btn"
+        style={{ fontSize: 12, padding: "4px 10px", color: "var(--hf-rose)", borderColor: "rgba(244,63,94,0.3)" }}
       >
         {pending ? "Unlinking…" : "Confirm unlink"}
       </button>

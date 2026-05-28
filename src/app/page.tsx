@@ -1,108 +1,292 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { signIn } from "@/auth";
 import { getSession } from "@/lib/session";
+import { Wordmark } from "@/components/ui/wordmark";
+import { ArrowRight, SparkleIcon, PlayIcon } from "@/components/ui/icons";
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function Home() {
   const session = await getSession();
   if (session) {
     redirect(session.username ? "/dashboard" : "/onboarding");
   }
 
-  const { error } = await searchParams;
-
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-8 p-8 bg-zinc-50 dark:bg-zinc-950">
-      <div className="max-w-md text-center animate-in">
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Steamloggd
-        </h1>
-        <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-          Track what you own, what you&apos;re playing, and what to play next.
-        </p>
+    <main
+      className="min-h-screen flex flex-col overflow-hidden"
+      style={{
+        background: "var(--hf-bg)",
+        backgroundImage: `radial-gradient(ellipse 80% 60% at 75% 50%, var(--hf-violet-bg) 0%, transparent 60%),
+                          radial-gradient(ellipse 60% 50% at 20% 90%, rgba(34,211,238,0.07) 0%, transparent 60%)`,
+      }}
+    >
+      {/* Nav */}
+      <header className="flex items-center justify-between px-9 py-5 relative z-10 animate-fade">
+        <Wordmark size={20} />
+        <nav className="flex items-center gap-5" style={{ fontSize: 13.5, color: "var(--hf-fg-muted)" }}>
+          <Link href="/signin" className="hover:text-white transition-colors" style={{ textDecoration: "none", color: "inherit" }}>
+            Sign in
+          </Link>
+          <Link
+            href="/signin"
+            className="hf-btn hf-btn-primary btn-press inline-flex items-center gap-2"
+            style={{ textDecoration: "none" }}
+          >
+            Get started <ArrowRight size={13} />
+          </Link>
+        </nav>
+      </header>
+
+      {/* Main grid */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-0 px-9 pb-7 pt-8 min-h-0">
+        {/* LEFT */}
+        <section className="flex flex-col justify-center max-w-[620px] pr-10 animate-in">
+          <div
+            className="inline-flex items-center gap-2 self-start mb-5"
+            style={{
+              padding: "5px 11px",
+              borderRadius: 999,
+              background: "var(--hf-violet-bg)",
+              border: "1px solid rgba(139,92,246,0.2)",
+              fontSize: 12,
+              color: "var(--hf-violet-soft)",
+            }}
+          >
+            <SparkleIcon size={12} /> Now in open beta · free forever
+          </div>
+
+          <h1
+            className="animate-in stagger-1"
+            style={{
+              fontSize: 76,
+              fontWeight: 600,
+              letterSpacing: "-0.045em",
+              lineHeight: 0.96,
+              margin: 0,
+              marginBottom: 22,
+            }}
+          >
+            Stop scrolling.
+            <br />
+            <span
+              className="hf-italic"
+              style={{
+                backgroundImage: "linear-gradient(90deg, var(--hf-violet-soft), var(--hf-cyan))",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Start playing.
+            </span>
+          </h1>
+
+          <p
+            className="animate-in stagger-2"
+            style={{
+              fontSize: 18,
+              color: "var(--hf-fg-muted)",
+              lineHeight: 1.5,
+              margin: 0,
+              marginBottom: 34,
+              letterSpacing: "-0.005em",
+              maxWidth: 500,
+            }}
+          >
+            Your backlog, shuffled. Pick your mood, set a time window, and
+            let SteamLoggd deal you the one game you should play next.
+          </p>
+
+          {/* CTA */}
+          <div className="flex gap-3 mb-11 animate-in stagger-3">
+            <Link
+              href="/signin"
+              className="hf-btn hf-btn-primary hf-btn-big btn-press inline-flex items-center gap-2"
+              style={{ textDecoration: "none", fontSize: 17, padding: "16px 28px" }}
+            >
+              Get started — it&apos;s free <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Value props */}
+          <div
+            className="grid grid-cols-3 gap-3.5 pt-6 animate-in stagger-4"
+            style={{ borderTop: "1px solid var(--hf-border-soft)" }}
+          >
+            {[
+              { n: "01", t: "Shuffle", d: "Mood + time → next game.", c: "var(--hf-violet-soft)" },
+              { n: "02", t: "Track", d: "Steam sync + status tags.", c: "var(--hf-cyan)" },
+              { n: "03", t: "Discover", d: "Stats, top genres, hall of fame.", c: "var(--hf-emerald)" },
+            ].map((v) => (
+              <div key={v.n}>
+                <span className="hf-mono" style={{ fontSize: 11, color: v.c, letterSpacing: "0.08em" }}>
+                  {v.n}
+                </span>
+                <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.015em", marginTop: 4 }}>
+                  {v.t}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--hf-fg-muted)", marginTop: 2, lineHeight: 1.35 }}>
+                  {v.d}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* RIGHT — deck preview */}
+        <section className="hidden lg:flex items-center justify-center relative animate-in-scale stagger-2">
+          <DeckPreview />
+        </section>
       </div>
 
-      <div className="flex flex-col gap-3 w-full max-w-xs">
-        <ProviderButton
-          provider="google"
-          label="Continue with Google"
-          className="bg-white hover:bg-zinc-50 text-zinc-900 ring-1 ring-zinc-300 hover:ring-zinc-400 shadow-sm"
-          delay="stagger-2"
-        />
-        <ProviderButton
-          provider="github"
-          label="Continue with GitHub"
-          className="bg-zinc-900 hover:bg-zinc-800 text-white ring-1 ring-zinc-700 hover:ring-zinc-600"
-          delay="stagger-3"
-        />
-        <ProviderButton
-          provider="discord"
-          label="Continue with Discord"
-          className="bg-[#5865F2] hover:bg-[#4752c4] text-white ring-1 ring-[#4752c4] hover:ring-[#3b44a8]"
-          delay="stagger-4"
-        />
-      </div>
-
-      {error === "AccessDenied" && (
-        <p className="text-sm text-red-600 dark:text-red-400 max-w-sm text-center">
-          Sign-in refused. If you used Discord, verify your email there first
-          and try again.
-        </p>
-      )}
+      {/* TODO: Add footer back with real user count & links to Privacy, Terms, GitHub pages once they exist */}
     </main>
   );
 }
 
-const PROVIDER_ICONS: Record<"google" | "github" | "discord", React.ReactNode> = {
-  google: (
-    <svg className="size-6" viewBox="0 0 48 48">
-      <path d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z" fill="#4285F4" />
-      <path d="M4.2 14.8l7 5.1C13.3 15.5 18.2 12 24 12c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 15.4 2 8.1 7.3 4.2 14.8z" fill="#EA4335" />
-      <path d="M24 46c5.4 0 10.3-1.8 14.1-5l-6.5-5.5C29.5 37.1 26.9 38 24 38c-6 0-11.1-4-12.8-9.5l-7 5.4C8 41 15.3 46 24 46z" fill="#34A853" />
-      <path d="M4.2 14.8l7 5.1c-.5 1.3-.7 2.7-.7 4.1s.3 2.8.7 4.1l-7 5.4C2.6 30.5 2 27.4 2 24s.6-6.5 2.2-9.2z" fill="#FBBC05" />
-    </svg>
-  ),
-  github: (
-    <svg className="size-6" viewBox="0 0 48 48" fill="currentColor">
-      <path d="M24 1A23 23 0 0 0 .7 27.6c0 10.2 6.6 18.8 15.8 21.9 1.2.2 1.6-.5 1.6-1.1v-4.3c-6.4 1.4-7.8-2.7-7.8-2.7-1-2.7-2.6-3.4-2.6-3.4-2.1-1.4.2-1.4.2-1.4 2.3.2 3.5 2.4 3.5 2.4 2.1 3.5 5.4 2.5 6.7 1.9.2-1.5.8-2.5 1.5-3.1-5.1-.6-10.5-2.6-10.5-11.4a9 9 0 0 1 2.4-6.2 8.3 8.3 0 0 1 .2-6.1s2-.6 6.4 2.4a22 22 0 0 1 11.6 0c4.4-3 6.3-2.4 6.3-2.4 1.3 3.2.5 5.5.2 6.1a9 9 0 0 1 2.4 6.2c0 8.9-5.4 10.8-10.6 11.4.8.7 1.6 2.1 1.6 4.3v6.3c0 .6.4 1.4 1.6 1.1A23 23 0 0 0 24 1" />
-    </svg>
-  ),
-  discord: (
-    <svg className="size-6" viewBox="0 0 48 48" fill="currentColor">
-      <path d="M40 10.5a38.5 38.5 0 0 0-9.6-3 .2.2 0 0 0-.2.1c-.4.8-.9 1.7-1.2 2.5a35.6 35.6 0 0 0-10.7 0A24.6 24.6 0 0 0 17 7.6a.2.2 0 0 0-.2-.1A38.4 38.4 0 0 0 7.3 10.5a.2.2 0 0 0-.1 0C2.2 17.2.7 23.7 1.5 30.2a.2.2 0 0 0 .1.1 39.4 39.4 0 0 0 11.7 5.9.2.2 0 0 0 .2 0 28 28 0 0 0 2.4-3.9.1.1 0 0 0-.1-.2 25 25 0 0 1-3.6-1.7.2.2 0 0 1 0-.3l.7-.5a.1.1 0 0 1 .2 0 27.4 27.4 0 0 0 23.4 0 .1.1 0 0 1 .2 0l.7.5a.2.2 0 0 1 0 .3 24 24 0 0 1-3.7 1.7.1.1 0 0 0 0 .2 27 27 0 0 0 2.4 3.9.2.2 0 0 0 .1 0 39.2 39.2 0 0 0 11.8-5.9.2.2 0 0 0 .1-.1c.9-9.4-1.6-17.5-6.8-24.7a.1.1 0 0 0 0 0zM16 26.6c-2.1 0-3.9-2-3.9-4.3s1.7-4.3 3.9-4.3 3.9 2 3.8 4.3c0 2.4-1.7 4.3-3.8 4.3zm14.2 0c-2.1 0-3.9-2-3.9-4.3s1.7-4.3 3.9-4.3 3.9 2 3.8 4.3c0 2.4-1.7 4.3-3.8 4.3z" />
-    </svg>
-  ),
-};
-
-function ProviderButton({
-  provider,
-  label,
-  className,
-  delay,
-}: {
-  provider: "google" | "github" | "discord";
-  label: string;
-  className: string;
-  delay?: string;
-}) {
+function DeckPreview() {
   return (
-    <form
-      action={async () => {
-        "use server";
-        await signIn(provider, { redirectTo: "/onboarding" });
-      }}
-      className={`animate-in ${delay ?? ""}`}
-    >
-      <button
-        type="submit"
-        className={`w-full rounded-lg px-6 py-3 font-medium btn-press flex items-center justify-center gap-3 ${className}`}
+    <div className="relative" style={{ width: 460, height: 600 }}>
+      {/* Ambient glow */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          inset: "15%",
+          background: "radial-gradient(circle, var(--hf-violet-glow) 0%, transparent 70%)",
+          filter: "blur(40px)",
+        }}
+      />
+
+      {/* Back cards */}
+      {[6, 5, 4, 3].map((i) => (
+        <div
+          key={i}
+          className="absolute"
+          style={{
+            left: "50%",
+            top: "50%",
+            transform: `translate(-50%, -50%) translate(${(i - 2) * 12}px, ${(i - 2) * 6}px) rotate(${(i - 3) * 3}deg)`,
+            width: 260,
+            height: 360,
+            borderRadius: 14,
+            background: "linear-gradient(155deg, var(--hf-surface) 0%, var(--hf-surface-elev) 50%, var(--hf-surface) 100%)",
+            backgroundImage: "repeating-linear-gradient(45deg, rgba(139,92,246,0.07) 0 1px, transparent 1px 8px)",
+            border: "1px solid var(--hf-border-soft)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+          }}
+        />
+      ))}
+
+      {/* Top card — revealed with real cover art */}
+      <div
+        className="absolute flex flex-col gap-2.5"
+        style={{
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -52%) rotate(-2deg)",
+          width: 280,
+          height: 400,
+          borderRadius: 14,
+          background: "var(--hf-surface)",
+          border: "1.5px solid rgba(139,92,246,0.33)",
+          padding: 14,
+          boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.2), 0 0 60px var(--hf-violet-glow)",
+        }}
       >
-        {PROVIDER_ICONS[provider]}
-        {label}
-      </button>
-    </form>
+        <div className="flex justify-between items-center">
+          <span className="hf-mono" style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--hf-violet-soft)" }}>
+            ★ TOP PICK
+          </span>
+          <span className="hf-mono" style={{ fontSize: 10, color: "var(--hf-fg-muted)" }}>97% MATCH</span>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://images.igdb.com/igdb/image/upload/t_cover_big/co1sfj.jpg"
+          alt="Disco Elysium"
+          className="object-cover shrink-0"
+          style={{
+            width: 252,
+            height: 196,
+            borderRadius: 10,
+            boxShadow: "0 8px 28px rgba(0,0,0,0.5)",
+          }}
+        />
+        <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.05 }}>
+          Disco Elysium
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          <span className="hf-pill">RPG</span>
+          <span className="hf-pill">Story-rich</span>
+          <span className="hf-pill" style={{ color: "var(--hf-violet-soft)" }}>~22h</span>
+        </div>
+        <div className="hf-btn hf-btn-primary justify-center mt-auto" style={{ pointerEvents: "none" }}>
+          <PlayIcon size={12} color="#fff" /> Start playing
+        </div>
+      </div>
+
+      {/* Annotation chips */}
+      <div
+        className="absolute"
+        style={{
+          top: 30,
+          right: -10,
+          background: "var(--hf-surface)",
+          border: "1px solid rgba(34,211,238,0.27)",
+          padding: "6px 11px",
+          borderRadius: 999,
+          fontSize: 11.5,
+          color: "var(--hf-cyan)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}
+      >
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 999,
+            background: "var(--hf-cyan)",
+            boxShadow: "0 0 8px var(--hf-cyan)",
+          }}
+        />
+        mood: chill · 22h fits weekend
+      </div>
+
+      <div
+        className="absolute flex flex-col gap-0.5"
+        style={{
+          bottom: 60,
+          left: -16,
+          background: "var(--hf-surface)",
+          border: "1px solid rgba(139,92,246,0.2)",
+          padding: "8px 12px",
+          borderRadius: 10,
+          fontSize: 12,
+          color: "var(--hf-fg-muted)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}
+      >
+        <span className="hf-mono" style={{ fontSize: 10, color: "var(--hf-violet-soft)", letterSpacing: "0.08em" }}>
+          SHUFFLE LIVE
+        </span>
+        <span>drawing 1 of 102 unplayed</span>
+      </div>
+
+      {/* Count chip */}
+      <div
+        className="absolute hf-mono"
+        style={{
+          bottom: -10,
+          left: "50%",
+          transform: "translateX(-50%)",
+          fontSize: 11.5,
+          color: "var(--hf-fg-dim)",
+          letterSpacing: "0.06em",
+        }}
+      >
+        102 cards in the deck
+      </div>
+    </div>
   );
 }
