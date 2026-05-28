@@ -1,36 +1,29 @@
-import Link from "next/link";
 import { requireSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { TopNav } from "@/components/ui/top-nav";
 import { RecommendClient } from "./recommend-client";
 
 export default async function RecommendPage() {
-  await requireSession();
+  const session = await requireSession();
+
+  const unplayedCount = await db.userGame.count({
+    where: { userId: session.userId, isMultiplayer: false, status: { in: ["UNPLAYED", "PAUSED"] } },
+  });
 
   return (
-    <main className="min-h-screen p-8 bg-zinc-50 dark:bg-zinc-950">
-      <nav className="max-w-2xl mx-auto mb-6 flex items-center gap-4 text-sm">
-        <Link
-          href="/dashboard"
-          className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-        >
-          ← Dashboard
-        </Link>
-        <span className="text-zinc-300 dark:text-zinc-700">|</span>
-        <span className="font-medium text-zinc-900 dark:text-zinc-50">What to play</span>
-      </nav>
+    <main
+      className="min-h-screen flex flex-col"
+      style={{
+        background: "var(--hf-bg)",
+        backgroundImage: "radial-gradient(ellipse 50% 40% at 50% 0%, var(--hf-violet-bg) 0%, transparent 70%)",
+        overflow: "hidden",
+      }}
+    >
+      <TopNav active="shuffle" username={session.username ?? session.name} steamLinked={!!session.steamId} />
 
-      <section className="max-w-2xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-            What should I play?
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Tell us how much time you have and pick a vibe — we&apos;ll score your
-            unplayed and paused games and return the top 3.
-          </p>
-        </div>
-
-        <RecommendClient />
-      </section>
+      <div className="flex-1 flex flex-col" style={{ padding: "24px 40px 32px", minHeight: 0 }}>
+        <RecommendClient unplayedCount={unplayedCount} />
+      </div>
     </main>
   );
 }

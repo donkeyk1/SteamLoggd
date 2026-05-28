@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const steamId = await verifySteamCallback(req.url);
   if (!steamId) {
     return NextResponse.redirect(
-      new URL("/settings/connections?error=steam_verify_failed", req.url)
+      new URL("/settings/profile?error=steam_verify_failed", req.url)
     );
   }
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     if (hasOauth) {
       // The Steam account already belongs to someone else's real account.
       return NextResponse.redirect(
-        new URL("/settings/connections?error=steam_already_linked", req.url)
+        new URL("/settings/profile?error=steam_already_linked", req.url)
       );
     }
 
@@ -52,14 +52,14 @@ export async function GET(req: NextRequest) {
     // Insert a fresh real Account row for the current user.
     await attachSteamAccount(session.userId, steamId);
     return NextResponse.redirect(
-      new URL("/settings/connections?success=steam_merged", req.url)
+      new URL("/settings/profile?success=steam_merged", req.url)
     );
   }
 
   if (existingAccount && existingAccount.userId === session.userId) {
     // Already linked to current user — re-link is a no-op.
     return NextResponse.redirect(
-      new URL("/settings/connections?success=steam_already", req.url)
+      new URL("/settings/profile?success=steam_already", req.url)
     );
   }
 
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   // current user.
   await attachSteamAccount(session.userId, steamId);
   return NextResponse.redirect(
-    new URL("/settings/connections?success=steam_linked", req.url)
+    new URL("/settings/profile?success=steam_linked", req.url)
   );
 }
 

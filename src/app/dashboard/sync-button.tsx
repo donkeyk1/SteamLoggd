@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SyncIcon } from "@/components/ui/icons";
 
 export function SyncSteamButton() {
   const router = useRouter();
@@ -11,34 +12,48 @@ export function SyncSteamButton() {
 
   async function handleClick() {
     setError(null);
-    const res = await fetch("/api/sync/steam", { method: "POST" });
-    const data = (await res.json()) as
+    setLastResult(null);
+
+    // Step 1: Sync Steam library
+    const syncRes = await fetch("/api/sync/steam", { method: "POST" });
+    const syncData = (await syncRes.json()) as
       | { synced: number; total: number }
       | { error: string };
 
-    if ("error" in data) {
-      setError(data.error);
+    if ("error" in syncData) {
+      setError(syncData.error);
       return;
     }
-    setLastResult(`Synced ${data.synced} of ${data.total} games.`);
+
+    let msg = `Synced ${syncData.synced} of ${syncData.total}`;
+
+    // Step 2: Enrich library (auto-run after sync)
+    try {
+      const enrichRes = await fetch("/api/enrich/library", { method: "POST" });
+      if (enrichRes.ok) {
+        const enrichData = (await enrichRes.json()) as {
+          igdbEnriched: number;
+          igdbCandidates: number;
+        };
+        if (enrichData.igdbEnriched > 0) {
+          msg += ` · enriched ${enrichData.igdbEnriched}`;
+        }
+      }
+    } catch {
+      // Enrich is best-effort, don't block on failure
+    }
+
+    setLastResult(msg);
     startTransition(() => router.refresh());
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <button
-        onClick={handleClick}
-        disabled={pending}
-        className="inline-flex items-center justify-center rounded-lg bg-zinc-900 hover:bg-zinc-700 disabled:opacity-50 px-4 py-2 text-white text-sm font-medium btn-press dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300 border border-zinc-700 hover:border-zinc-600"
-      >
-        {pending ? "Syncing…" : "Sync Steam library"}
+    <div className="flex items-center gap-2">
+      <button onClick={handleClick} disabled={pending} className="hf-btn btn-press" style={{ padding: "6px 10px" }}>
+        <SyncIcon size={13} /> {pending ? "Syncing…" : "Sync"}
       </button>
-      {lastResult && (
-        <p className="text-sm text-green-700 dark:text-green-400">{lastResult}</p>
-      )}
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">Error: {error}</p>
-      )}
+      {lastResult && <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-emerald)" }}>{lastResult}</span>}
+      {error && <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-rose)" }}>Error: {error}</span>}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
 
 const OnboardingSchema = z.object({
   username: z.string().trim().min(3).max(24),
-  displayName: z.string().trim().min(1).max(60),
+  displayName: z.string().trim().min(1).max(60).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { username, displayName } = parsed.data;
+  const { username, displayName = username } = parsed.data;
 
   if (!validateUsernameFormat(username)) {
     return NextResponse.json(

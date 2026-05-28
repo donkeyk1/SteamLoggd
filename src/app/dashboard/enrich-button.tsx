@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SparkleIcon } from "@/components/ui/icons";
 
 type EnrichResult = {
   igdbEnriched: number;
@@ -44,21 +45,21 @@ export function EnrichButton({ initialUnenriched }: { initialUnenriched: number 
       <button
         onClick={handleClick}
         disabled={running}
-        className="inline-flex items-center justify-center rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-50 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        className="hf-btn"
+        style={{ padding: "6px 10px" }}
       >
-        {running ? "Enriching…" : `Enrich library (${initialUnenriched} pending)`}
+        <SparkleIcon size={13} /> {running ? "Enriching…" : `Enrich (${initialUnenriched} pending)`}
       </button>
       {result && (
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-          IGDB matched: {result.igdbEnriched} / {result.igdbCandidates}
-          {result.igdbMerged > 0 && ` (+ ${result.igdbMerged} duplicates merged)`}
-          {" · "}
-          Time-to-beat found: {result.ttbEnriched} / {result.ttbCandidates}
-          {result.pruned > 0 && ` · ${result.pruned} unrecognised game${result.pruned === 1 ? "" : "s"} removed`}
-        </p>
+        <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-emerald)" }}>
+          IGDB: {result.igdbEnriched}/{result.igdbCandidates}
+          {result.igdbMerged > 0 && ` (+${result.igdbMerged} merged)`}
+          {" · "}TTB: {result.ttbEnriched}/{result.ttbCandidates}
+          {result.pruned > 0 && ` · ${result.pruned} pruned`}
+        </span>
       )}
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">Error: {error}</p>
+        <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-rose)" }}>Error: {error}</span>
       )}
     </div>
   );

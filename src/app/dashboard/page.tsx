@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Game, GameStatus, UserGame } from "@prisma/client";
-import { Avatar } from "@/components/avatar";
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -9,68 +8,35 @@ import {
   type AchievementProgress,
 } from "@/lib/steam/achievements";
 import { scoreGames, buildGenreAffinity } from "@/lib/recommender/score";
+import { TopNav } from "@/components/ui/top-nav";
+import { GameCover } from "@/components/ui/game-cover";
+import { StatusPill } from "@/components/ui/status-pill";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { DiceIcon, SparkleIcon, ArrowRight, StarIcon } from "@/components/ui/icons";
 import { SyncSteamButton } from "./sync-button";
-import { EnrichButton } from "./enrich-button";
 
 function formatPlaytime(minutes: number | null | undefined) {
   if (!minutes) return "—";
   const hours = minutes / 60;
-  if (hours < 10) return `${hours.toFixed(1)} h`;
-  return `${Math.round(hours)} h`;
+  if (hours < 10) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours)}h`;
 }
-
 
 const STATUS_STYLES: Record<
   GameStatus,
-  { label: string; bar: string; hex: string; pill: string }
+  { label: string; hex: string }
 > = {
-  WISHLIST: {
-    label: "Wishlist",
-    bar: "bg-violet-500",
-    hex: "#8b5cf6",
-    pill: "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30",
-  },
-  UNTRIAGED: {
-    label: "Untriaged",
-    bar: "bg-zinc-500",
-    hex: "#71717a",
-    pill: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30",
-  },
-  UNPLAYED: {
-    label: "Unplayed",
-    bar: "bg-zinc-400",
-    hex: "#a1a1aa",
-    pill: "bg-zinc-500/15 text-zinc-300 ring-1 ring-zinc-500/30",
-  },
-  PLAYING: {
-    label: "Playing",
-    bar: "bg-cyan-500",
-    hex: "#06b6d4",
-    pill: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30",
-  },
-  PAUSED: {
-    label: "Paused",
-    bar: "bg-amber-500",
-    hex: "#f59e0b",
-    pill: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30",
-  },
-  BEAT: {
-    label: "Beat",
-    bar: "bg-emerald-500",
-    hex: "#10b981",
-    pill: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30",
-  },
-  DROPPED: {
-    label: "Dropped",
-    bar: "bg-red-500",
-    hex: "#ef4444",
-    pill: "bg-red-500/15 text-red-300 ring-1 ring-red-500/30",
-  },
+  WISHLIST: { label: "Wishlist", hex: "#8b5cf6" },
+  UNTRIAGED: { label: "Untriaged", hex: "#71717a" },
+  UNPLAYED: { label: "Unplayed", hex: "#a1a1aa" },
+  PLAYING: { label: "Playing", hex: "#22d3ee" },
+  PAUSED: { label: "Paused", hex: "#fbbf24" },
+  BEAT: { label: "Beat", hex: "#10b981" },
+  DROPPED: { label: "Dropped", hex: "#f43f5e" },
 };
 
 export default async function DashboardPage() {
   const session = await requireSession();
-
   const userId = session.userId;
   const steamId = session.steamId;
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
@@ -81,10 +47,8 @@ export default async function DashboardPage() {
     candidates,
     ratedBeat,
     topRated,
-    recentGames,
     statusCountsRaw,
     beatThisYear,
-    unenrichedCount,
     allUserGames,
   ] = await Promise.all([
     db.user.findUnique({
@@ -131,16 +95,6 @@ export default async function DashboardPage() {
       orderBy: [{ rating: "desc" }, { finishedAt: "desc" }],
       take: 12,
     }),
-    db.userGame.findMany({
-      where: { userId },
-      include: { game: true },
-      orderBy: [
-        { lastPlayedAt: { sort: "desc", nulls: "last" } },
-        { steamPlaytime2weeksMinutes: { sort: "desc", nulls: "last" } },
-        { addedAt: "desc" },
-      ],
-      take: 10,
-    }),
     db.userGame.groupBy({
       by: ["status"],
       where: { userId, isMultiplayer: false },
@@ -148,9 +102,6 @@ export default async function DashboardPage() {
     }),
     db.userGame.count({
       where: { userId, status: "BEAT", finishedAt: { gte: yearStart } },
-    }),
-    db.userGame.count({
-      where: { userId, source: "STEAM", game: { igdbId: null } },
     }),
     db.userGame.findMany({
       where: { userId },
@@ -163,13 +114,8 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  if (!user) {
-    // Session points at a User row that no longer exists. Bounce to root;
-    // Auth.js will clear the stale session on the next request.
-    redirect("/");
-  }
+  if (!user) redirect("/");
 
-  // Compute top 3 genres weighted by playtime + beaten status
   const genreStats = new Map<string, { hours: number; beaten: number }>();
   for (const row of allUserGames) {
     const mins = (row.steamPlaytimeMinutes ?? 0) + (row.manualPlaytimeMinutes ?? 0);
@@ -198,13 +144,7 @@ export default async function DashboardPage() {
   const completionPct = totalSP > 0 ? Math.round((beatCount / totalSP) * 100) : 0;
 
   const statusCounts: Record<GameStatus, number> = {
-    WISHLIST: 0,
-    UNTRIAGED: 0,
-    UNPLAYED: 0,
-    PLAYING: 0,
-    PAUSED: 0,
-    BEAT: 0,
-    DROPPED: 0,
+    WISHLIST: 0, UNTRIAGED: 0, UNPLAYED: 0, PLAYING: 0, PAUSED: 0, BEAT: 0, DROPPED: 0,
   };
   for (const row of statusCountsRaw) {
     statusCounts[row.status] = row._count.status;
@@ -214,7 +154,6 @@ export default async function DashboardPage() {
   const affinityMap = buildGenreAffinity(ratedBeat);
   const topPicks = scoreGames(candidates, 60, [], affinityMap).slice(0, 3);
 
-  // Best-effort achievement fetch for up to 3 PLAYING games (parallel)
   const achievementsMap = new Map<string, AchievementProgress | null>();
   if (steamId && playingGames.length > 0) {
     const promises = playingGames
@@ -229,277 +168,122 @@ export default async function DashboardPage() {
   }
 
   const currentYear = new Date().getFullYear();
+  const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-50">
-      <header className="max-w-6xl mx-auto px-6 pt-6 pb-4 flex items-center justify-between animate-fade">
-        <div className="flex items-center gap-3">
-          <Avatar
-            steamImage={user.steamImage}
-            image={user.image}
-            name={user.name ?? user.username}
-          />
+    <main className="min-h-screen hf-scroll" style={{ background: "var(--hf-bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <TopNav active="dashboard" username={user.username ?? user.name} steamLinked={!!steamId} />
+
+      <div className="flex-1 flex flex-col gap-5" style={{ padding: "24px 36px 32px", overflowY: "auto" }}>
+        {/* Greeting */}
+        <div className="flex justify-between items-end animate-fade">
           <div>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-              Signed in as
-            </p>
-            <p className="text-sm font-semibold text-zinc-50">
-              {user.name ?? user.username ?? "Anonymous"}
-            </p>
+            <div className="hf-cap" style={{ marginBottom: 4 }}>WELCOME BACK · {dayName}</div>
+            <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.05 }}>
+              Hey, {user.username ?? user.name ?? "there"}.
+            </h1>
+            <div style={{ fontSize: 14, color: "var(--hf-fg-muted)", marginTop: 6 }}>
+              <span style={{ color: "var(--hf-fg)", fontWeight: 500 }}>{user._count.userGames} games tracked</span>
+              {" · "}{beatThisYear} beat this year
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/settings/connections"
-            className="text-sm text-zinc-500 hover:text-zinc-100 transition-colors"
-          >
-            Settings
-          </Link>
-          <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="text-sm text-zinc-500 hover:text-zinc-100 transition-colors"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-6 pb-12 space-y-8">
-        {user._count.userGames === 0 && !steamId && (
-          <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 px-5 py-3 text-sm text-violet-100">
-            Already used Steamloggd before?{" "}
-            <Link
-              href="/settings/connections"
-              className="font-semibold underline hover:text-white"
-            >
-              Link your Steam account
-            </Link>{" "}
-            to recover your backlog.
-          </div>
-        )}
-
-        {/* Action bar */}
-        <div className="flex flex-wrap items-center gap-2 animate-in stagger-1">
-          <Link
-            href="/recommend"
-            className="text-sm rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 px-4 py-2 font-semibold text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 btn-press"
-          >
-            ✨ What should I play?
-          </Link>
-          <Link
-            href="/backlog"
-            className="text-sm rounded-lg border border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 px-4 py-2 text-zinc-300 btn-press"
-          >
-            Full backlog →
-          </Link>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex gap-2 items-center">
             <SyncSteamButton />
-            {unenrichedCount > 0 && (
-              <EnrichButton initialUnenriched={unenrichedCount} />
-            )}
+            <Link href="/recommend" className="hf-btn hf-btn-primary btn-press">
+              <DiceIcon size={14} /> What should I play?
+            </Link>
           </div>
         </div>
 
         {/* NOW PLAYING hero */}
         {playingGames.length > 0 && (
-          <section className="space-y-3 animate-in stagger-2">
-            <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-              Now Playing
-            </h2>
-            <div
-              className={`grid gap-4 ${
-                playingGames.length === 1
-                  ? "grid-cols-1"
-                  : "grid-cols-1 md:grid-cols-2"
-              }`}
-            >
-              {playingGames.slice(0, 4).map((row) => (
-                <NowPlayingCard
-                  key={row.id}
-                  row={row}
-                  achievements={achievementsMap.get(row.id) ?? null}
-                />
-              ))}
-            </div>
+          <section className="animate-in stagger-1">
+            <NowPlayingHero
+              row={playingGames[0]}
+              achievements={achievementsMap.get(playingGames[0].id) ?? null}
+            />
           </section>
         )}
 
-        {/* Stat cards */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-in stagger-3">
-          <StatCard
-            value={user._count.userGames.toLocaleString()}
-            label="Games tracked"
-            accent="violet"
-          />
-          <StatCard
-            value={beatThisYear.toString()}
-            label={`Beat in ${currentYear}`}
-            accent="emerald"
-          />
-          <CompletionCard pct={completionPct} beaten={beatCount} total={totalSP} />
-          <TopGenresCard genres={topGenres.map((g) => ({ name: g.genre, hours: g.hours, beaten: g.beaten }))} />
-        </section>
-
-        {/* Top picks + Status breakdown */}
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-in stagger-4">
-          <div className="lg:col-span-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 backdrop-blur p-5 card-hover">
-            <div className="flex items-baseline justify-between mb-4">
-              <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                Top picks for you
-              </h2>
-              <Link
-                href="/recommend"
-                className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-              >
-                Customize →
-              </Link>
-            </div>
-            {topPicks.length === 0 ? (
-              <p className="text-sm text-zinc-500">
-                No unplayed games. Add some from the backlog!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {topPicks.map(({ row, why }, i) => (
-                  <TopPickRow key={row.id} rank={i + 1} row={row} why={why} />
-                ))}
+        {/* Stat row */}
+        <div className="grid grid-cols-4 gap-3.5 animate-in stagger-2">
+          <StatTile label="GAMES TRACKED" value={user._count.userGames.toLocaleString()} sub={`${topGenres.length > 0 ? topGenres[0].genre + " dominant" : ""}`} accent="var(--hf-violet)" />
+          <StatTile label={`BEAT IN ${currentYear}`} value={beatThisYear.toString()} color="var(--hf-emerald)" accent="var(--hf-emerald)" />
+          <div className="hf-card card-hover p-[18px] relative overflow-hidden flex flex-col justify-between" style={{ minHeight: 130 }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 60% at 100% 0%, rgba(34,211,238,0.1) 0%, transparent 60%)" }} />
+            <div className="hf-cap relative">COMPLETION RATE</div>
+            <div className="relative">
+              <div className="flex items-baseline gap-2">
+                <div style={{ fontSize: 42, fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                  {completionPct}<span style={{ fontSize: 22, color: "var(--hf-fg-muted)" }}>%</span>
+                </div>
+                <div className="hf-mono" style={{ fontSize: 12, color: "var(--hf-fg-muted)" }}>{beatCount}/{totalSP}</div>
               </div>
-            )}
-          </div>
-
-          <div className="lg:col-span-2 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 backdrop-blur p-5 card-hover">
-            <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-4">
-              By status
-            </h2>
-
-            <div className="flex items-center gap-5">
-              {/* Donut chart */}
-              <DonutChart statusCounts={statusCounts} total={statusTotal} />
-
-              {/* Legend */}
-              <div className="flex-1 space-y-1.5">
-                {(Object.keys(STATUS_STYLES) as GameStatus[])
-                  .sort((a, b) => statusCounts[b] - statusCounts[a])
-                  .map((status) => {
-                  const count = statusCounts[status];
-                  const style = STATUS_STYLES[status];
-                  return (
-                    <div key={status} className="flex items-center gap-2 text-sm">
-                      <span className={`w-2 h-2 rounded-full ${style.bar} shrink-0`} />
-                      <span className="flex-1 text-xs text-zinc-400">
-                        {style.label}
-                      </span>
-                      <span className="text-xs text-zinc-500 tabular-nums">
-                        {count}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              <ProgressBar pct={completionPct} color="var(--hf-cyan)" height={5} className="mt-3" />
             </div>
-            <p className="text-[10px] text-zinc-600 mt-3">
-              Single-player only · multiplayer tracked separately
-            </p>
           </div>
-        </section>
+          <div className="hf-card card-hover p-[18px] relative overflow-hidden flex flex-col justify-between" style={{ minHeight: 130 }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 60% at 100% 0%, rgba(251,191,36,0.1) 0%, transparent 60%)" }} />
+            <div className="hf-cap relative">TOP GENRES</div>
+            <div className="relative flex flex-col gap-[7px]">
+              {topGenres.length === 0 ? (
+                <span style={{ fontSize: 13, color: "var(--hf-fg-dim)" }}>No genre data yet</span>
+              ) : (
+                topGenres.map((g, i) => (
+                  <div key={g.genre} className="flex items-baseline gap-2">
+                    <span className="hf-mono" style={{ fontSize: 10, color: "var(--hf-amber)", width: 14 }}>{i + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, flex: 1, letterSpacing: "-0.005em" }}>{g.genre}</span>
+                    <span className="hf-mono" style={{ fontSize: 10.5, color: "var(--hf-fg-dim)" }}>
+                      {g.hours < 1 ? "<1" : Math.round(g.hours)}h
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Two col: Quick Picks + By Status */}
+        <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 animate-in stagger-3">
+          <QuickPicks picks={topPicks} />
+          <ByStatus statusCounts={statusCounts} total={statusTotal} />
+        </div>
 
         {/* Hall of Fame */}
         {topRated.length > 0 && (
-          <section className="space-y-3 animate-in stagger-5">
-            <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-              Hall of Fame · highest-rated games
-            </h2>
-            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2">
+          <section className="animate-in stagger-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <span className="hf-cap" style={{ color: "var(--hf-fg)", fontWeight: 600 }}>HALL OF FAME</span>
+                <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg-dim)" }}>· HIGHEST RATED</span>
+              </div>
+              <Link href="/backlog?status=BEAT&sort=recent" className="link-hover" style={{ fontSize: 12, color: "var(--hf-violet-soft)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                See all {topRated.length} <ArrowRight size={11} color="var(--hf-violet-soft)" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-12 gap-2">
               {topRated.map((row) => (
-                <div
-                  key={row.id}
-                  className="aspect-[3/4] rounded-md overflow-hidden relative group ring-1 ring-zinc-800/50 hover:ring-violet-500/60 transition-all duration-200 hover:scale-110 hover:z-10 hover:shadow-lg hover:shadow-violet-500/20"
-                  title={`${row.game.title} · ${row.rating}/5`}
-                >
-                  {row.game.coverUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={row.game.coverUrl}
-                      alt={row.game.title}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                    <p className="text-[10px] font-semibold text-white line-clamp-2 leading-tight">
-                      {row.game.title}
-                    </p>
-                    <p className="text-[10px] text-amber-400 mt-0.5">
-                      {"★".repeat(row.rating ?? 0)}
-                    </p>
+                <Link key={row.id} href={`/backlog?q=${encodeURIComponent(row.game.title)}`} className="relative cursor-pointer group card-hover" style={{ textDecoration: "none" }}>
+                  <GameCover name={row.game.title} coverUrl={row.game.coverUrl} radius={8} />
+                  <div
+                    className="absolute flex gap-0.5 items-center"
+                    style={{
+                      top: 5,
+                      right: 5,
+                      background: "rgba(0,0,0,0.6)",
+                      backdropFilter: "blur(4px)",
+                      padding: "2px 5px",
+                      borderRadius: 999,
+                    }}
+                  >
+                    {Array.from({ length: row.rating ?? 0 }).map((_, j) => (
+                      <StarIcon key={j} size={8} color="var(--hf-amber)" />
+                    ))}
+                    <span className="hf-mono" style={{ fontSize: 9, color: "var(--hf-amber)", marginLeft: 1 }}>{row.rating}</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
-          </section>
-        )}
-
-        {/* Recent activity */}
-        {recentGames.length > 0 && (
-          <section className="space-y-3 animate-in stagger-6">
-            <h2 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-              Recent activity
-            </h2>
-            <div className="space-y-2">
-              {recentGames.map((row) => (
-                <div
-                  key={row.id}
-                  className="group rounded-xl bg-zinc-900/50 border border-zinc-800/50 backdrop-blur p-3 flex items-center gap-4 hover:bg-zinc-800/50 hover:border-zinc-700/50 card-hover"
-                >
-                  {row.game.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={row.game.coverUrl}
-                      alt=""
-                      className="w-10 h-14 object-cover rounded-md shadow-md shadow-black/30 shrink-0 group-hover:shadow-lg group-hover:shadow-black/40 transition-shadow"
-                    />
-                  ) : (
-                    <div className="w-10 h-14 rounded-md bg-zinc-800 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-100 truncate">
-                      {row.game.title}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span
-                        className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${
-                          STATUS_STYLES[row.status].pill
-                        }`}
-                      >
-                        {STATUS_STYLES[row.status].label}
-                      </span>
-                      {row.isMultiplayer && (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30">
-                          MP
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm text-zinc-400 tabular-nums">
-                      {formatPlaytime(row.steamPlaytimeMinutes)}
-                    </p>
-                    <p className="text-xs text-zinc-600 tabular-nums">
-                      {row.lastPlayedAt
-                        ? row.lastPlayedAt.toLocaleDateString()
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/backlog"
-              className="block text-xs text-zinc-500 hover:text-zinc-300 text-right"
-            >
-              View full backlog →
-            </Link>
           </section>
         )}
       </div>
@@ -507,180 +291,50 @@ export default async function DashboardPage() {
   );
 }
 
-function StatCard({
-  value,
+function StatTile({
   label,
+  value,
+  sub,
+  color,
   accent,
 }: {
-  value: string;
   label: string;
-  accent: "violet" | "emerald" | "cyan" | "amber";
-}) {
-  const accentClass = {
-    violet: "from-violet-500/15",
-    emerald: "from-emerald-500/15",
-    cyan: "from-cyan-500/15",
-    amber: "from-amber-500/15",
-  }[accent];
-
-  return (
-    <div
-      className={`rounded-xl bg-gradient-to-br ${accentClass} to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover`}
-    >
-      <div className="text-2xl md:text-3xl font-bold text-zinc-50 tabular-nums">
-        {value}
-      </div>
-      <div className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1 font-bold">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function CompletionCard({
-  pct,
-  beaten,
-  total,
-}: {
-  pct: number;
-  beaten: number;
-  total: number;
+  value: string;
+  sub?: string;
+  color?: string;
+  accent?: string;
 }) {
   return (
-    <div className="rounded-xl bg-gradient-to-br from-cyan-500/15 to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover">
-      <div className="flex items-end gap-2">
-        <div className="text-2xl md:text-3xl font-bold text-zinc-50 tabular-nums">
-          {pct}%
-        </div>
-        <span className="text-xs text-zinc-500 mb-1 tabular-nums">
-          {beaten}/{total}
-        </span>
-      </div>
-      <div className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1 font-bold">
-        Completion rate
-      </div>
-      <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+    <div className="hf-card card-hover p-[18px] relative overflow-hidden flex flex-col justify-between" style={{ minHeight: 130 }}>
+      {accent && (
         <div
-          className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all"
-          style={{ width: `${pct}%` }}
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse 80% 60% at 100% 0%, color-mix(in srgb, ${accent} 10%, transparent) 0%, transparent 60%)` }}
         />
-      </div>
-    </div>
-  );
-}
-
-function DonutChart({
-  statusCounts,
-  total,
-}: {
-  statusCounts: Record<GameStatus, number>;
-  total: number;
-}) {
-  const displaySize = 120;
-  const scale = 3;
-  const size = displaySize * scale;
-  const strokeWidth = 14 * scale;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const gap = 4 * scale;
-
-  const activeStatuses = (Object.keys(STATUS_STYLES) as GameStatus[]).filter(
-    (s) => statusCounts[s] > 0
-  );
-  const totalGap = activeStatuses.length > 1 ? gap * activeStatuses.length : 0;
-  const usable = circumference - totalGap;
-
-  let offset = 0;
-  const segments = activeStatuses.map((status) => {
-    const pct = statusCounts[status] / total;
-    const dashLength = pct * usable;
-    const seg = { status, dashLength, offset, hex: STATUS_STYLES[status].hex };
-    offset += dashLength + gap;
-    return seg;
-  });
-
-  return (
-    <div className="relative shrink-0" style={{ width: displaySize, height: displaySize }}>
-      <svg
-        width={displaySize}
-        height={displaySize}
-        viewBox={`0 0 ${size} ${size}`}
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="#27272a"
-          strokeWidth={strokeWidth}
-        />
-        {segments.map((seg) => (
-          <circle
-            key={seg.status}
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={seg.hex}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${seg.dashLength} ${circumference - seg.dashLength}`}
-            strokeDashoffset={-seg.offset}
-            strokeLinecap="butt"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        ))}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-lg font-bold text-zinc-50 tabular-nums leading-none">
-          {total}
-        </span>
-        <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0.5">
-          games
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function TopGenresCard({
-  genres,
-}: {
-  genres: { name: string; hours: number; beaten: number }[];
-}) {
-  const medals = ["text-amber-400", "text-zinc-400", "text-amber-700"];
-  const medalLabels = ["1st", "2nd", "3rd"];
-  return (
-    <div className="rounded-xl bg-gradient-to-br from-amber-500/15 to-zinc-900/40 border border-zinc-800/50 backdrop-blur p-5 card-hover">
-      <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2">
-        Top genres
-      </div>
-      {genres.length === 0 ? (
-        <p className="text-sm text-zinc-600">No genre data yet</p>
-      ) : (
-        <div className="space-y-1.5">
-          {genres.map((g, i) => (
-            <div key={g.name} className="flex items-center gap-2">
-              <span
-                className={`text-xs font-bold w-7 shrink-0 ${medals[i] ?? "text-zinc-600"}`}
-              >
-                {medalLabels[i]}
-              </span>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm text-zinc-200 truncate block">{g.name}</span>
-                <span className="text-[10px] text-zinc-500 tabular-nums">
-                  {g.hours < 1 ? "<1" : Math.round(g.hours)}h played
-                  {g.beaten > 0 && ` · ${g.beaten} beaten`}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
       )}
+      <div className="hf-cap relative">{label}</div>
+      <div className="relative">
+        <div
+          style={{
+            fontSize: 42,
+            fontWeight: 600,
+            letterSpacing: "-0.035em",
+            lineHeight: 1,
+            color: color || "var(--hf-fg)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {value}
+        </div>
+        {sub && (
+          <div className="hf-mono" style={{ fontSize: 12, color: "var(--hf-fg-muted)", marginTop: 6 }}>{sub}</div>
+        )}
+      </div>
     </div>
   );
 }
 
-function NowPlayingCard({
+function NowPlayingHero({
   row,
   achievements,
 }: {
@@ -690,129 +344,243 @@ function NowPlayingCard({
   const game = row.game;
   const playedHrs = row.steamPlaytimeMinutes ? row.steamPlaytimeMinutes / 60 : 0;
   const hltb = game.hltbMainHours;
-  const beatProgress =
-    hltb && hltb > 0 ? Math.min(100, (playedHrs / hltb) * 100) : null;
-  const achievementPct =
-    achievements && achievements.total > 0
-      ? (achievements.achieved / achievements.total) * 100
-      : null;
+  const beatProgress = hltb && hltb > 0 ? Math.min(100, (playedHrs / hltb) * 100) : null;
+  const achievementPct = achievements && achievements.total > 0 ? (achievements.achieved / achievements.total) * 100 : null;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl ring-1 ring-zinc-800/50 hover:ring-cyan-500/30 bg-zinc-900 card-hover">
+    <div
+      className="relative overflow-hidden card-hover"
+      style={{
+        borderRadius: 20,
+        border: "1px solid rgba(34,211,238,0.2)",
+        background: "var(--hf-surface)",
+        minHeight: 200,
+      }}
+    >
+      {/* Blurred bg art */}
       {game.coverUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={game.coverUrl}
           alt=""
           aria-hidden
-          className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-30"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ filter: "blur(40px) saturate(1.2)", transform: "scale(1.2)", opacity: 0.5 }}
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/30 via-zinc-950/75 to-zinc-950" />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(9,9,11,0.85) 0%, rgba(9,9,11,0.6) 50%, rgba(9,9,11,0.85) 100%)" }} />
 
-      <div className="relative z-10 flex gap-4 p-5">
-        {game.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={game.coverUrl}
-            alt={game.title}
-            className="w-20 md:w-24 h-28 md:h-32 object-cover rounded-lg shadow-xl shadow-black/50 shrink-0"
-          />
-        ) : (
-          <div className="w-20 md:w-24 h-28 md:h-32 rounded-lg bg-zinc-800 shrink-0" />
-        )}
-
-        <div className="flex-1 min-w-0 space-y-2.5">
+      <div className="relative flex gap-7 p-[26px]">
+        <GameCover name={game.title} coverUrl={game.coverUrl} w={188} h={264} radius={12} glow />
+        <div className="flex-1 flex flex-col justify-between min-w-0">
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-cyan-400 font-bold mb-0.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              Now Playing
-            </p>
-            <h3 className="text-lg md:text-xl font-bold text-zinc-50 leading-tight line-clamp-2">
-              {game.title}
-            </h3>
+            <div
+              className="inline-flex items-center gap-1.5"
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: "var(--hf-cyan-bg)",
+                border: "1px solid rgba(34,211,238,0.27)",
+              }}
+            >
+              <span
+                className="animate-pulse-glow"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: "var(--hf-cyan)",
+                  boxShadow: "0 0 8px var(--hf-cyan)",
+                }}
+              />
+              <span className="hf-mono" style={{ fontSize: 10.5, color: "var(--hf-cyan)", letterSpacing: "0.12em" }}>
+                NOW PLAYING
+              </span>
+            </div>
+            <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <h2 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.03em", margin: "10px 0 4px", lineHeight: 1, transition: "color 0.15s ease" }} className="hover:text-violet-400">
+                {game.title}
+              </h2>
+            </Link>
+            <div className="hf-mono" style={{ fontSize: 13, color: "var(--hf-fg-muted)", letterSpacing: "0.02em" }}>
+              {playedHrs.toFixed(1)}h played
+              {row.lastPlayedAt && ` · last ${row.lastPlayedAt.toLocaleDateString()}`}
+              {hltb && hltb > 0 && ` · ~${hltb.toFixed(0)}h to beat`}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-            <span className="tabular-nums">{playedHrs.toFixed(1)} h played</span>
-            {row.lastPlayedAt && (
-              <span>Last {row.lastPlayedAt.toLocaleDateString()}</span>
+          <div className="flex flex-col gap-3.5 max-w-[580px] mt-6">
+            {beatProgress !== null && (
+              <div>
+                <div className="flex justify-between mb-[7px]">
+                  <span className="hf-cap" style={{ color: "var(--hf-cyan)" }}>PROGRESS TO BEAT</span>
+                  <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg)" }}>{Math.round(beatProgress)}%</span>
+                </div>
+                <ProgressBar pct={beatProgress} color="var(--hf-cyan)" height={10} />
+              </div>
             )}
-            {hltb && hltb > 0 && <span>~{hltb.toFixed(0)} h to beat</span>}
+            {achievementPct !== null && achievements && (
+              <div>
+                <div className="flex justify-between mb-[7px]">
+                  <span className="hf-cap" style={{ color: "var(--hf-amber)" }}>ACHIEVEMENTS</span>
+                  <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg)" }}>
+                    {achievements.achieved} / {achievements.total}
+                  </span>
+                </div>
+                <ProgressBar pct={achievementPct} color="var(--hf-amber)" height={10} />
+              </div>
+            )}
           </div>
+        </div>
 
-          {beatProgress !== null && (
-            <div>
-              <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
-                <span>Progress to beat</span>
-                <span className="tabular-nums">{Math.round(beatProgress)}%</span>
-              </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-violet-500"
-                  style={{ width: `${beatProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {achievementPct !== null && achievements && (
-            <div>
-              <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
-                <span>Achievements</span>
-                <span className="tabular-nums">
-                  {achievements.achieved} / {achievements.total}
-                </span>
-              </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-yellow-300"
-                  style={{ width: `${achievementPct}%` }}
-                />
-              </div>
-            </div>
-          )}
+        <div className="flex flex-col gap-1.5 items-end justify-end shrink-0">
+          <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} className="hf-btn btn-press">Mark beat</Link>
+          <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} className="hf-btn hf-btn-ghost btn-press" style={{ fontSize: 12 }}>Pause</Link>
         </div>
       </div>
     </div>
   );
 }
 
-function TopPickRow({
-  rank,
-  row,
-  why,
+function QuickPicks({
+  picks,
 }: {
-  rank: number;
-  row: UserGame & { game: Game };
-  why: string;
+  picks: { row: UserGame & { game: Game }; why: string }[];
 }) {
   return (
-    <div className="flex gap-3 items-center rounded-lg px-2 py-1.5 -mx-2 hover:bg-zinc-800/50 transition-all duration-200 group">
-      <span className="w-5 text-lg font-bold text-zinc-700 tabular-nums shrink-0 group-hover:text-zinc-500 transition-colors">
-        {rank}
-      </span>
-      {row.game.coverUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={row.game.coverUrl}
-          alt=""
-          className="w-9 h-12 object-cover rounded shrink-0 group-hover:shadow-md group-hover:shadow-black/40 transition-shadow"
-        />
-      ) : (
-        <div className="w-9 h-12 rounded bg-zinc-800 shrink-0" />
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-zinc-100 truncate">
-          {row.game.title}
-        </p>
-        <p className="text-xs text-zinc-500 italic truncate">{why}</p>
+    <div className="hf-card card-hover p-5 flex flex-col">
+      <div className="flex justify-between items-center mb-3.5">
+        <div className="flex items-center gap-2">
+          <SparkleIcon size={14} color="var(--hf-violet-soft)" />
+          <span className="hf-cap" style={{ color: "var(--hf-fg)", fontWeight: 600 }}>QUICK PICKS</span>
+          <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg-dim)" }}>· mini shuffle</span>
+        </div>
+        <Link
+          href="/recommend"
+          className="link-hover"
+          style={{ fontSize: 12, color: "var(--hf-violet-soft)", display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          Full shuffle <ArrowRight size={11} color="var(--hf-violet-soft)" />
+        </Link>
       </div>
-      {row.game.hltbMainHours && row.game.hltbMainHours > 0 && (
-        <span className="text-xs text-zinc-500 tabular-nums shrink-0">
-          ~{row.game.hltbMainHours.toFixed(0)} h
+      <div className="flex flex-col gap-1">
+        {picks.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--hf-fg-dim)" }}>No unplayed games. Add some from the backlog!</p>
+        ) : (
+          picks.map(({ row, why }, i) => (
+            <Link
+              key={row.id}
+              href={`/backlog?q=${encodeURIComponent(row.game.title)}`}
+              className="flex items-center gap-3 row-hover"
+              style={{
+                padding: "10px 8px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.015)",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg-dim)", width: 14 }}>{i + 1}</span>
+              <GameCover name={row.game.title} coverUrl={row.game.coverUrl} w={42} h={56} radius={6} />
+              <div className="flex-1 min-w-0">
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    letterSpacing: "-0.01em",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {row.game.title}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--hf-fg-muted)", marginTop: 2 }}>{why}</div>
+              </div>
+              {row.game.hltbMainHours && row.game.hltbMainHours > 0 && (
+                <span className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg-dim)" }}>
+                  ~{row.game.hltbMainHours.toFixed(0)}h
+                </span>
+              )}
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ByStatus({
+  statusCounts,
+  total,
+}: {
+  statusCounts: Record<GameStatus, number>;
+  total: number;
+}) {
+  const data = [
+    { label: "Unplayed", n: statusCounts.UNPLAYED, c: "var(--hf-fg-dim)", hex: "#71717a" },
+    { label: "Beat", n: statusCounts.BEAT, c: "var(--hf-emerald)", hex: "#10b981" },
+    { label: "Wishlist", n: statusCounts.WISHLIST, c: "var(--hf-violet)", hex: "#8b5cf6" },
+    { label: "Paused", n: statusCounts.PAUSED, c: "var(--hf-amber)", hex: "#fbbf24" },
+    { label: "Playing", n: statusCounts.PLAYING, c: "var(--hf-cyan)", hex: "#22d3ee" },
+    { label: "Dropped", n: statusCounts.DROPPED, c: "var(--hf-rose)", hex: "#f43f5e" },
+    { label: "Untriaged", n: statusCounts.UNTRIAGED, c: "var(--hf-fg-dim)", hex: "#52525b" },
+  ].filter((d) => d.n > 0);
+
+  let cur = 0;
+  const stops = data.map((d) => {
+    const start = cur;
+    cur += (d.n / (total || 1)) * 360;
+    return `${d.hex} ${start}deg ${cur}deg`;
+  });
+
+  return (
+    <div className="hf-card card-hover p-5 flex flex-col">
+      <div className="flex justify-between items-center mb-3.5">
+        <span className="hf-cap" style={{ color: "var(--hf-fg)", fontWeight: 600 }}>BY STATUS</span>
+        <span className="hf-mono" style={{ fontSize: 10.5, color: "var(--hf-fg-dim)" }}>
+          SINGLE-PLAYER · {total} GAMES
         </span>
-      )}
+      </div>
+      <div className="flex items-center gap-5">
+        {/* Donut */}
+        <div
+          className="shrink-0 relative"
+          style={{
+            width: 130,
+            height: 130,
+            borderRadius: 999,
+            background: total > 0 ? `conic-gradient(${stops.join(", ")})` : "var(--hf-surface-elev)",
+            padding: 16,
+          }}
+        >
+          <div
+            className="absolute flex flex-col items-center justify-center"
+            style={{
+              inset: 16,
+              borderRadius: 999,
+              background: "var(--hf-surface)",
+              border: "1px solid var(--hf-border-soft)",
+            }}
+          >
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1 }}>{total}</div>
+            <span className="hf-mono" style={{ fontSize: 9.5, color: "var(--hf-fg-dim)", letterSpacing: "0.1em", marginTop: 2 }}>
+              GAMES
+            </span>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex-1 flex flex-col gap-1.5">
+          {data.map((d) => (
+            <div key={d.label} className="flex items-center gap-2" style={{ fontSize: 13 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: d.hex, flexShrink: 0 }} />
+              <span className="flex-1" style={{ color: "var(--hf-fg-muted)", letterSpacing: "-0.005em" }}>{d.label}</span>
+              <span className="hf-mono" style={{ fontSize: 12, color: "var(--hf-fg)" }}>{d.n}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

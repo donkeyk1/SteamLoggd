@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 
 const PatchSchema = z.object({
   name: z.string().trim().min(1).max(60).nullable(),
-  image: z.string().url().max(500).nullable(),
+  image: z.string().url().max(500).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest) {
