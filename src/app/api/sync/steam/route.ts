@@ -2,29 +2,23 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { fetchOwnedGames } from "@/lib/steam/library";
+import { enrichUserLibrary } from "@/lib/igdb/enrich";
+
+const BATCH = 20;
 
 export async function POST() {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-  }
-  if (!session.steamId) {
-    return NextResponse.json({ error: "steam_not_linked" }, { status: 409 });
-  }
+  if (!session) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+  if (!session.steamId) return NextResponse.json({ error: "steam_not_linked" }, { status: 409 });
 
   const { userId, steamId } = session;
-
-  const job = await db.syncJob.create({
-    data: { userId, type: "steam_library", status: "RUNNING" },
-  });
+  const job = await db.syncJob.create({ data: { userId, type: "steam_library", status: "RUNNING" } });
 
   try {
+    // ── Import the Steam library ───────────────────────────────────────────
     const games = await fetchOwnedGames(steamId);
-
     const named = games.filter((g) => !!g.name);
 
-    // Upsert Game rows in parallel batches of 20
-    const BATCH = 20;
     for (let i = 0; i < named.length; i += BATCH) {
       await Promise.all(
         named.slice(i, i + BATCH).map((g) =>
@@ -37,7 +31,6 @@ export async function POST() {
       );
     }
 
-    // Fetch all just-upserted game rows to get their IDs
     const appIds = named.map((g) => g.appid);
     const gameRows = await db.game.findMany({
       where: { steamAppId: { in: appIds } },
@@ -45,8 +38,7 @@ export async function POST() {
     });
     const gameByAppId = new Map(gameRows.map((r) => [r.steamAppId!, r.id]));
 
-    // Upsert UserGame rows in batches
-    let upserted = 0;
+    let synced = 0;
     for (let i = 0; i < named.length; i += BATCH) {
       const results = await Promise.all(
         named.slice(i, i + BATCH).map((g) => {
@@ -59,9 +51,7 @@ export async function POST() {
           return db.userGame.upsert({
             where: { userId_gameId: { userId, gameId } },
             create: {
-              userId,
-              gameId,
-              source: "STEAM",
+              userId, gameId, source: "STEAM",
               steamPlaytimeMinutes: g.playtime_forever,
               steamPlaytime2weeksMinutes: g.playtime_2weeks ?? null,
               lastPlayedAt,
@@ -74,21 +64,18 @@ export async function POST() {
           });
         })
       );
-      upserted += results.filter(Boolean).length;
+      synced += results.filter(Boolean).length;
     }
 
-    await db.syncJob.update({
-      where: { id: job.id },
-      data: { status: "SUCCEEDED", finishedAt: new Date() },
-    });
+    // ── Enrich (IGDB metadata + themes + time-to-beat, prune untouched junk) ─
+    const enrich = await enrichUserLibrary(userId);
 
-    return NextResponse.json({ synced: upserted, total: games.length });
+    await db.syncJob.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date() } });
+
+    return NextResponse.json({ synced, total: games.length, ...enrich });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
-    await db.syncJob.update({
-      where: { id: job.id },
-      data: { status: "FAILED", finishedAt: new Date(), error: message },
-    });
+    await db.syncJob.update({ where: { id: job.id }, data: { status: "FAILED", finishedAt: new Date(), error: message } });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

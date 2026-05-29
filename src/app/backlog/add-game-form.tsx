@@ -21,6 +21,7 @@ type Suggestion = {
   releaseYear?: number;
   coverUrl?: string;
   genres: string[];
+  themes: string[];
 };
 
 type StagedGame = Suggestion & {
@@ -178,6 +179,7 @@ export function AddGameForm() {
           title: s.title,
           coverUrl: s.coverUrl,
           genres: s.genres,
+          themes: s.themes,
           releaseYear: s.releaseYear,
           status: s.status,
           priority: s.priority,
@@ -215,6 +217,7 @@ export function AddGameForm() {
       payload.igdbId = picked.igdbId;
       payload.coverUrl = picked.coverUrl;
       payload.genres = picked.genres;
+      payload.themes = picked.themes;
       payload.releaseYear = picked.releaseYear;
     }
 

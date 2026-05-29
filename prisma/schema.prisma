@@ -70,6 +70,7 @@ model Game {
   title         String
   coverUrl      String?
   genres        String[]   @default([])
+  themes        String[]   @default([]) // IGDB themes (Horror, Comedy, Drama…) — tone, used by vibe gate
   releaseYear   Int?
   hltbMainHours Float?
   createdAt     DateTime   @default(now())

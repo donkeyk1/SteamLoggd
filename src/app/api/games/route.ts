@@ -17,6 +17,7 @@ const AddGameSchema = z.object({
   igdbId: z.number().int().positive().optional(),
   coverUrl: z.string().url().max(500).optional(),
   genres: z.array(z.string().max(60)).max(20).optional(),
+  themes: z.array(z.string().max(60)).max(20).optional(),
   releaseYear: z.number().int().min(1950).max(2100).optional(),
 });
 
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { title, status, priority, rating, platform, notes, igdbId, coverUrl, genres, releaseYear } =
+  const { title, status, priority, rating, platform, notes, igdbId, coverUrl, genres, themes, releaseYear } =
     parsed.data;
 
   // Best-effort IGDB time-to-beat lookup. Only works if we have an IGDB id.
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
           title,
           coverUrl,
           genres: genres ?? [],
+          themes: themes ?? [],
           releaseYear,
           hltbMainHours,
         },
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
           title,
           ...(coverUrl ? { coverUrl } : {}),
           ...(genres && genres.length ? { genres } : {}),
+          ...(themes && themes.length ? { themes } : {}),
           ...(releaseYear ? { releaseYear } : {}),
           ...(hltbMainHours ? { hltbMainHours } : {}),
         },
@@ -71,6 +74,7 @@ export async function POST(req: NextRequest) {
           title,
           coverUrl,
           genres: genres ?? [],
+          themes: themes ?? [],
           releaseYear,
           hltbMainHours,
         },

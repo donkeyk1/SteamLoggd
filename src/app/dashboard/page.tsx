@@ -7,7 +7,13 @@ import {
   fetchAchievementProgress,
   type AchievementProgress,
 } from "@/lib/steam/achievements";
-import { scoreGames, buildGenreAffinity } from "@/lib/recommender/score";
+import {
+  scoreGames,
+  buildGenreAffinity,
+  buildCurrentTaste,
+  selectPicks,
+  type AffinityInput,
+} from "@/lib/recommender/score";
 import { TopNav } from "@/components/ui/top-nav";
 import { GameCover } from "@/components/ui/game-cover";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -45,7 +51,7 @@ export default async function DashboardPage() {
     user,
     playingGames,
     candidates,
-    ratedBeat,
+    opinionGames,
     topRated,
     statusCountsRaw,
     beatThisYear,
@@ -79,10 +85,15 @@ export default async function DashboardPage() {
     db.userGame.findMany({
       where: {
         userId,
-        status: { in: ["BEAT", "DROPPED"] },
-        rating: { not: null },
+        status: { in: ["BEAT", "DROPPED", "PLAYING", "PAUSED"] },
       },
-      select: { rating: true, game: { select: { genres: true } } },
+      select: {
+        status: true,
+        rating: true,
+        steamPlaytimeMinutes: true,
+        manualPlaytimeMinutes: true,
+        game: { select: { genres: true, hltbMainHours: true } },
+      },
     }),
     db.userGame.findMany({
       where: {
@@ -115,6 +126,7 @@ export default async function DashboardPage() {
   ]);
 
   if (!user) redirect("/");
+
 
   const genreStats = new Map<string, { hours: number; beaten: number }>();
   for (const row of allUserGames) {
@@ -151,8 +163,25 @@ export default async function DashboardPage() {
   }
   const statusTotal = Object.values(statusCounts).reduce((a, b) => a + b, 0);
 
-  const affinityMap = buildGenreAffinity(ratedBeat);
-  const topPicks = scoreGames(candidates, 60, [], affinityMap).slice(0, 3);
+  const affinityInput: AffinityInput[] = opinionGames.map((g) => ({
+    status: g.status,
+    rating: g.rating,
+    playtimeMinutes: (g.steamPlaytimeMinutes ?? 0) + (g.manualPlaytimeMinutes ?? 0),
+    hltbMainHours: g.game.hltbMainHours,
+    genres: g.game.genres,
+  }));
+  const affinityMap = buildGenreAffinity(affinityInput);
+  const currentTaste = buildCurrentTaste(playingGames.map((p) => ({ genres: p.game.genres })));
+  const topPicks = selectPicks(
+    scoreGames(
+      candidates,
+      { vibes: [], genres: [], sessionMinutes: 120, desiredLength: "any" },
+      affinityMap,
+      currentTaste
+    ),
+    3,
+    { diversityPenalty: 0.15 }
+  );
 
   const achievementsMap = new Map<string, AchievementProgress | null>();
   if (steamId && playingGames.length > 0) {

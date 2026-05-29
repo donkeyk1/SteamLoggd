@@ -35,6 +35,7 @@ const ResolvedGameSchema = z.object({
   title: z.string().trim().min(1).max(200),
   coverUrl: z.string().url().max(500).optional(),
   genres: z.array(z.string().max(60)).max(20).default([]),
+  themes: z.array(z.string().max(60)).max(20).default([]),
   releaseYear: z.number().int().min(1950).max(2100).optional(),
   // Per-game overrides — optional so older callers / titles-path still work
   status: StatusEnum.optional(),
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
           title: g.title,
           coverUrl: g.coverUrl,
           genres: g.genres,
+          themes: g.themes,
           releaseYear: g.releaseYear,
         },
         statusOverride: g.status,
@@ -151,6 +153,7 @@ export async function POST(req: NextRequest) {
               title: m.igdb.title,
               coverUrl: m.igdb.coverUrl,
               genres: m.igdb.genres,
+              themes: m.igdb.themes,
               releaseYear: m.igdb.releaseYear,
               hltbMainHours: hltbMap.get(m.igdb.igdbId) ?? null,
             },
@@ -158,6 +161,7 @@ export async function POST(req: NextRequest) {
               title: m.igdb.title,
               ...(m.igdb.coverUrl ? { coverUrl: m.igdb.coverUrl } : {}),
               ...(m.igdb.genres.length ? { genres: m.igdb.genres } : {}),
+              ...(m.igdb.themes.length ? { themes: m.igdb.themes } : {}),
               ...(m.igdb.releaseYear ? { releaseYear: m.igdb.releaseYear } : {}),
               ...(hltbMap.get(m.igdb.igdbId)
                 ? { hltbMainHours: hltbMap.get(m.igdb.igdbId) }

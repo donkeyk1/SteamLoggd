@@ -64,6 +64,7 @@ export type IgdbGame = {
   first_release_date?: number; // unix seconds
   cover?: { image_id: string };
   genres?: { name: string }[];
+  themes?: { name: string }[];
   summary?: string;
 };
 
@@ -73,6 +74,7 @@ export type GameSearchResult = {
   releaseYear?: number;
   coverUrl?: string;
   genres: string[];
+  themes: string[];
 };
 
 function buildCoverUrl(imageId?: string): string | undefined {
@@ -96,7 +98,7 @@ export async function searchGames(query: string, limit = 8): Promise<GameSearchR
   //   2. `where name ~ *"..."*` — case-insensitive substring; works for
   //      autocomplete-style partial typing, no ranking by relevance.
   // We merge the results, dedupe by igdbId, and prefer search-result order.
-  const fields = "name, first_release_date, cover.image_id, genres.name";
+  const fields = "name, first_release_date, cover.image_id, genres.name, themes.name";
   const searchQuery = `search "${escaped}"; fields ${fields}; where version_parent = null; limit ${limit};`;
   const substringQuery = `fields ${fields}; where name ~ *"${escaped}"* & version_parent = null; sort first_release_date desc; limit ${limit};`;
 
@@ -114,7 +116,11 @@ export async function searchGames(query: string, limit = 8): Promise<GameSearchR
     if (merged.length >= limit) break;
   }
 
-  return merged.map((g) => ({
+  return merged.map(toSearchResult);
+}
+
+function toSearchResult(g: IgdbGame): GameSearchResult {
+  return {
     igdbId: g.id,
     title: g.name,
     releaseYear: g.first_release_date
@@ -122,7 +128,8 @@ export async function searchGames(query: string, limit = 8): Promise<GameSearchR
       : undefined,
     coverUrl: buildCoverUrl(g.cover?.image_id),
     genres: g.genres?.map((x) => x.name) ?? [],
-  }));
+    themes: g.themes?.map((x) => x.name) ?? [],
+  };
 }
 
 /**
@@ -154,7 +161,7 @@ export async function lookupBySteamAppIds(
 
     const gameIds = externals.map((e) => e.game);
     const gamesQuery = `
-      fields id, name, first_release_date, cover.image_id, genres.name;
+      fields id, name, first_release_date, cover.image_id, genres.name, themes.name;
       where id = (${gameIds.join(",")});
       limit ${CHUNK};
     `;
@@ -166,16 +173,32 @@ export async function lookupBySteamAppIds(
       if (!g) continue;
       const steamAppId = Number(ext.uid);
       if (!Number.isFinite(steamAppId)) continue;
-      out.set(steamAppId, {
-        igdbId: g.id,
-        title: g.name,
-        releaseYear: g.first_release_date
-          ? new Date(g.first_release_date * 1000).getUTCFullYear()
-          : undefined,
-        coverUrl: buildCoverUrl(g.cover?.image_id),
-        genres: g.genres?.map((x) => x.name) ?? [],
-      });
+      out.set(steamAppId, toSearchResult(g));
     }
+  }
+  return out;
+}
+
+/**
+ * Look up games directly by their IGDB ids. Used to backfill genres/themes on
+ * games that were enriched before we started fetching themes.
+ */
+export async function fetchGamesByIgdbIds(
+  igdbIds: number[]
+): Promise<Map<number, GameSearchResult>> {
+  const out = new Map<number, GameSearchResult>();
+  if (igdbIds.length === 0) return out;
+
+  const CHUNK = 100;
+  for (let i = 0; i < igdbIds.length; i += CHUNK) {
+    const slice = igdbIds.slice(i, i + CHUNK);
+    const query = `
+      fields id, name, first_release_date, cover.image_id, genres.name, themes.name;
+      where id = (${slice.join(",")});
+      limit ${CHUNK};
+    `;
+    const games = await igdbFetch<IgdbGame[]>("games", query);
+    for (const g of games) out.set(g.id, toSearchResult(g));
   }
   return out;
 }
@@ -219,20 +242,12 @@ export async function fetchTimeToBeats(
 
 export async function getGameById(igdbId: number): Promise<GameSearchResult | null> {
   const q = `
-    fields name, first_release_date, cover.image_id, genres.name;
+    fields name, first_release_date, cover.image_id, genres.name, themes.name;
     where id = ${igdbId};
     limit 1;
   `;
   const results = await igdbFetch<IgdbGame[]>("games", q);
   const g = results[0];
   if (!g) return null;
-  return {
-    igdbId: g.id,
-    title: g.name,
-    releaseYear: g.first_release_date
-      ? new Date(g.first_release_date * 1000).getUTCFullYear()
-      : undefined,
-    coverUrl: buildCoverUrl(g.cover?.image_id),
-    genres: g.genres?.map((x) => x.name) ?? [],
-  };
+  return toSearchResult(g);
 }
