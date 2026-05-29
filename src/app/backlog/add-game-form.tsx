@@ -104,7 +104,7 @@ export function AddGameForm() {
     const q = title.trim();
     if (mode === "single" && picked && picked.title === title) return;
     if (q.length < 2) {
-      setSuggestions([]);
+      setSuggestions([]); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
