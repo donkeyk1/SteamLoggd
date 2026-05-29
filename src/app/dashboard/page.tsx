@@ -197,11 +197,15 @@ export default async function DashboardPage() {
 
         {/* NOW PLAYING hero */}
         {playingGames.length > 0 && (
-          <section className="animate-in stagger-1">
-            <NowPlayingHero
-              row={playingGames[0]}
-              achievements={achievementsMap.get(playingGames[0].id) ?? null}
-            />
+          <section className="animate-in stagger-1 flex gap-3.5">
+            {playingGames.map((row) => (
+              <NowPlayingHero
+                key={row.id}
+                row={row}
+                achievements={achievementsMap.get(row.id) ?? null}
+                compact={playingGames.length > 1}
+              />
+            ))}
           </section>
         )}
 
@@ -337,9 +341,11 @@ function StatTile({
 function NowPlayingHero({
   row,
   achievements,
+  compact = false,
 }: {
   row: UserGame & { game: Game };
   achievements: AchievementProgress | null;
+  compact?: boolean;
 }) {
   const game = row.game;
   const playedHrs = row.steamPlaytimeMinutes ? row.steamPlaytimeMinutes / 60 : 0;
@@ -347,9 +353,12 @@ function NowPlayingHero({
   const beatProgress = hltb && hltb > 0 ? Math.min(100, (playedHrs / hltb) * 100) : null;
   const achievementPct = achievements && achievements.total > 0 ? (achievements.achieved / achievements.total) * 100 : null;
 
+  const coverW = compact ? 130 : 188;
+  const coverH = compact ? 184 : 264;
+
   return (
     <div
-      className="relative overflow-hidden card-hover"
+      className="relative overflow-hidden card-hover flex-1"
       style={{
         borderRadius: 20,
         border: "1px solid rgba(34,211,238,0.2)",
@@ -371,7 +380,7 @@ function NowPlayingHero({
       <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(9,9,11,0.85) 0%, rgba(9,9,11,0.6) 50%, rgba(9,9,11,0.85) 100%)" }} />
 
       <div className="relative flex gap-7 p-[26px]">
-        <GameCover name={game.title} coverUrl={game.coverUrl} w={188} h={264} radius={12} glow />
+        <GameCover name={game.title} coverUrl={game.coverUrl} w={coverW} h={coverH} radius={12} glow />
         <div className="flex-1 flex flex-col justify-between min-w-0">
           <div>
             <div
