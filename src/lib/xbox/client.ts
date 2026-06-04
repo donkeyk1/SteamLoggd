@@ -48,17 +48,14 @@ export async function resolveGamertag(gamertag: string): Promise<XboxProfile | n
     throw new Error(`OpenXBL ${res.status}: ${body.slice(0, 300)}`);
   }
 
-  // Log the raw response structure in development so we can fix the parser if needed.
   const raw = await res.json().catch(() => null);
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[xbox] /friends/search response keys:", raw ? Object.keys(raw) : null);
-  }
 
   const json = raw as { profileUsers?: ProfileUser[]; people?: ProfileUser[] } | null;
   const user = json?.profileUsers?.[0] ?? json?.people?.[0];
   if (!user) {
-    // Return null = "not found"; caller shows the friendly "not found" message.
-    return null;
+    // Include the raw response shape so the caller can surface it for debugging.
+    const keys = raw ? JSON.stringify(raw).slice(0, 400) : "null";
+    throw new Error(`parse_failed: ${keys}`);
   }
 
   const xuid = user.id ?? user.xuid;
