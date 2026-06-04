@@ -30,7 +30,13 @@ type ProfileUser = {
 
 /** Resolve a gamertag to its stable XUID (plus display name + avatar). */
 export async function resolveGamertag(gamertag: string): Promise<XboxProfile | null> {
-  const res = await fetch(`${XBL_BASE}/search/${encodeURIComponent(gamertag)}`, {
+  // Modern Xbox gamertags can include a # discriminator (e.g. "Donkey#8758").
+  // The search API only accepts the display name portion, so strip the suffix.
+  const displayName = gamertag.includes("#") ? gamertag.split("#")[0] : gamertag;
+  const url = new URL(`${XBL_BASE}/friends/search`);
+  url.searchParams.set("gt", displayName);
+
+  const res = await fetch(url, {
     headers: xblHeaders(),
     cache: "no-store",
   });

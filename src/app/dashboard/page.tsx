@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { DiceIcon, SparkleIcon, ArrowRight, StarIcon } from "@/components/ui/icons";
 import { SyncButton } from "./sync-button";
+import { XboxDashboardButton } from "./xbox-button";
 
 function formatPlaytime(minutes: number | null | undefined) {
   if (!minutes) return "—";
@@ -225,7 +226,7 @@ export default async function DashboardPage() {
           </div>
           <div className="flex gap-2 items-center">
             {steamId && <SyncButton endpoint="/api/sync/steam" label="Sync Steam" />}
-            {xboxLinked && <SyncButton endpoint="/api/sync/xbox" label="Sync Xbox" />}
+            <XboxDashboardButton linked={xboxLinked} />
             <Link href="/recommend" className="hf-btn hf-btn-primary btn-press">
               <DiceIcon size={14} /> What should I play?
             </Link>
