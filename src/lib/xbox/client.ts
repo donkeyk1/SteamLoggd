@@ -101,8 +101,11 @@ export async function fetchTitleHistory(xuid: string): Promise<XboxTitle[]> {
     throw new Error(`Xbox titleHistory failed: ${res.status} ${res.statusText}`);
   }
 
-  const json = (await res.json().catch(() => null)) as { titles?: RawTitle[] } | null;
-  const titles = json?.titles ?? [];
+  const json = (await res.json().catch(() => null)) as {
+    content?: { titles?: RawTitle[] };
+    titles?: RawTitle[];
+  } | null;
+  const titles = json?.content?.titles ?? json?.titles ?? [];
 
   return titles
     .filter((t) => t.titleId != null && !!t.name && (t.type ? t.type === "Game" : true))
