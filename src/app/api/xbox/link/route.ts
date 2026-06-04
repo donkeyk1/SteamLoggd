@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
   let profile;
   try {
     profile = await resolveGamertag(parsed.data.gamertag);
-  } catch {
-    return NextResponse.json({ error: "xbox_api_error" }, { status: 502 });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[xbox/link] resolveGamertag threw:", detail);
+    return NextResponse.json({ error: "xbox_api_error", detail }, { status: 502 });
   }
   if (!profile) {
     return NextResponse.json({ error: "gamertag_not_found" }, { status: 404 });

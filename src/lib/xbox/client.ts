@@ -28,11 +28,12 @@ type ProfileUser = {
   settings?: ProfileSetting[];
 };
 
-/** Resolve a gamertag to its stable XUID (plus display name + avatar). */
+/** Resolve a gamertag to its stable XUID (plus display name + avatar).
+ *  Throws with a descriptive message on API/HTTP errors (not "not found"). */
 export async function resolveGamertag(gamertag: string): Promise<XboxProfile | null> {
   // Modern Xbox gamertags can include a # discriminator (e.g. "Donkey#8758").
   // The search API only accepts the display name portion, so strip the suffix.
-  const displayName = gamertag.includes("#") ? gamertag.split("#")[0] : gamertag;
+  const displayName = gamertag.includes("#") ? gamertag.split("#")[0].trim() : gamertag.trim();
   const url = new URL(`${XBL_BASE}/friends/search`);
   url.searchParams.set("gt", displayName);
 
@@ -40,13 +41,25 @@ export async function resolveGamertag(gamertag: string): Promise<XboxProfile | n
     headers: xblHeaders(),
     cache: "no-store",
   });
-  if (!res.ok) return null;
 
-  const json = (await res.json().catch(() => null)) as
-    | { profileUsers?: ProfileUser[]; people?: ProfileUser[] }
-    | null;
+  // Surface real error details so we can debug response shape issues.
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenXBL ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  // Log the raw response structure in development so we can fix the parser if needed.
+  const raw = await res.json().catch(() => null);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[xbox] /friends/search response keys:", raw ? Object.keys(raw) : null);
+  }
+
+  const json = raw as { profileUsers?: ProfileUser[]; people?: ProfileUser[] } | null;
   const user = json?.profileUsers?.[0] ?? json?.people?.[0];
-  if (!user) return null;
+  if (!user) {
+    // Return null = "not found"; caller shows the friendly "not found" message.
+    return null;
+  }
 
   const xuid = user.id ?? user.xuid;
   if (!xuid) return null;

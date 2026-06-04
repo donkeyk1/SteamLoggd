@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-const ERROR_COPY: Record<string, string> = {
-  gamertag_not_found: "No Xbox profile found for that gamertag.",
-  already_linked_other: "That Xbox account is already linked to a different SteamLoggd account.",
-  xbox_api_error: "Couldn't reach Xbox right now — please try again.",
-  invalid_input: "Enter a valid gamertag.",
-};
+function errorMsg(data: { error?: string; detail?: string }): string {
+  if (data.error === "gamertag_not_found") return "No Xbox profile found for that gamertag.";
+  if (data.error === "already_linked_other") return "That Xbox account is already linked to a different account.";
+  if (data.error === "invalid_input") return "Enter a valid gamertag.";
+  if (data.error === "xbox_api_error") return `Xbox API error: ${data.detail ?? "unknown"}`;
+  return `Error: ${data.error ?? "unknown"}`;
+}
 
 export function LinkXboxForm() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export function LinkXboxForm() {
         return;
       }
       const data = await res.json().catch(() => ({}));
-      setError(ERROR_COPY[data.error] ?? "Something went wrong.");
+      setError(errorMsg(data));
     });
   }
 

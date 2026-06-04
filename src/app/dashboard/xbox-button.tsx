@@ -14,12 +14,14 @@ type SyncResult = {
   titleMatchRemaining?: number;
 };
 
-const LINK_ERRORS: Record<string, string> = {
-  gamertag_not_found: "Gamertag not found.",
-  already_linked_other: "That Xbox account belongs to a different user.",
-  xbox_api_error: "Couldn't reach Xbox — try again.",
-  invalid_input: "Enter a valid gamertag.",
-};
+function linkErrorMsg(data: { error?: string; detail?: string }): string {
+  if (data.error === "gamertag_not_found") return "Gamertag not found — check the spelling.";
+  if (data.error === "already_linked_other") return "That Xbox account belongs to a different user.";
+  if (data.error === "invalid_input") return "Enter a valid gamertag.";
+  // Surface raw API errors so response-shape issues are visible.
+  if (data.error === "xbox_api_error") return `Xbox API error: ${data.detail ?? "unknown"}`;
+  return `Error: ${data.error ?? "unknown"}`;
+}
 
 export function XboxDashboardButton({ linked }: { linked: boolean }) {
   const router = useRouter();
@@ -51,7 +53,7 @@ export function XboxDashboardButton({ linked }: { linked: boolean }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setLinkError(LINK_ERRORS[data.error] ?? "Something went wrong.");
+        setLinkError(linkErrorMsg(data));
         return;
       }
       // Refresh the page so the server re-reads the linked state and shows
