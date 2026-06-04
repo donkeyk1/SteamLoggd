@@ -15,7 +15,7 @@ const XBL_BASE = "https://xbl.io/api/v2";
 function xblHeaders(): HeadersInit {
   const key = process.env.XBOX_API_KEY;
   if (!key) throw new Error("XBOX_API_KEY is not set");
-  return { "X-Authorization": key, Accept: "application/json" };
+  return { "X-Authorization": key, Accept: "application/json", "Accept-Language": "en-US" };
 }
 
 export type XboxProfile = { xuid: string; gamertag: string; avatarUrl?: string };
