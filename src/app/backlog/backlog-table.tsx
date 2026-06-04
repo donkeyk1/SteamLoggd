@@ -368,7 +368,7 @@ export function BacklogTable({
 
               {/* Platform */}
               <span className="hf-mono" style={{ fontSize: 11.5, color: "var(--hf-fg-dim)" }}>
-                {row.source === "STEAM" ? "Steam" : row.platform || "—"}
+                {row.source === "STEAM" ? "Steam" : row.source === "XBOX" ? "Xbox" : row.platform || "—"}
               </span>
 
               {/* Mode (SP/MP) — clickable */}

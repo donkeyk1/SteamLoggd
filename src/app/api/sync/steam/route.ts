@@ -4,6 +4,9 @@ import { getSession } from "@/lib/session";
 import { fetchOwnedGames } from "@/lib/steam/library";
 import { enrichUserLibrary } from "@/lib/igdb/enrich";
 
+// Enrichment may throttle title-matching for any non-Steam games in the library.
+export const maxDuration = 60;
+
 const BATCH = 20;
 
 export async function POST() {
