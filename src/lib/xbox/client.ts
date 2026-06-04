@@ -15,7 +15,7 @@ const XBL_BASE = "https://xbl.io/api/v2";
 function xblHeaders(): HeadersInit {
   const key = process.env.XBOX_API_KEY;
   if (!key) throw new Error("XBOX_API_KEY is not set");
-  return { "X-Authorization": key, Accept: "application/json" };
+  return { "X-Authorization": key, Accept: "application/json", "Accept-Language": "en-US" };
 }
 
 export type XboxProfile = { xuid: string; gamertag: string; avatarUrl?: string };
@@ -96,9 +96,16 @@ export async function fetchTitleHistory(xuid: string): Promise<XboxTitle[]> {
   }
 
   const raw = await res.json().catch(() => null);
-  // OpenXBL wraps responses in a `content` key.
-  const json = raw as { content?: { titles?: RawTitle[] }; titles?: RawTitle[] } | null;
-  const titles = json?.content?.titles ?? json?.titles ?? [];
+  // OpenXBL wraps responses in a `content` key — but the inner key name may
+  // vary. Throw with the raw shape so we can identify it if titles is empty.
+  const json = raw as { content?: Record<string, unknown>; titles?: RawTitle[] } | null;
+  const inner = json?.content ?? json ?? {};
+  const contentKeys = Object.keys(inner);
+  const titles: RawTitle[] = (inner.titles as RawTitle[] | undefined) ?? [];
+
+  if (titles.length === 0 && raw != null) {
+    throw new Error(`titleHistory_empty: content keys=${contentKeys.join(",")} raw=${JSON.stringify(raw).slice(0, 400)}`);
+  }
 
   return titles
     .filter((t) => t.titleId != null && !!t.name && (t.type ? t.type === "Game" : true))
