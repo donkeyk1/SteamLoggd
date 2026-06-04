@@ -31,9 +31,9 @@ type ProfileUser = {
 /** Resolve a gamertag to its stable XUID (plus display name + avatar).
  *  Throws with a descriptive message on API/HTTP errors (not "not found"). */
 export async function resolveGamertag(gamertag: string): Promise<XboxProfile | null> {
-  // Modern Xbox gamertags can include a # discriminator (e.g. "Donkey#8758").
-  // The search API only accepts the display name portion, so strip the suffix.
-  const displayName = gamertag.includes("#") ? gamertag.split("#")[0].trim() : gamertag.trim();
+  // Modern Xbox gamertags display as "Donkey#8758" but the lookup format is
+  // "Donkey8758" (# removed, suffix kept) — matching the xbox.com URL format.
+  const displayName = gamertag.trim().replace("#", "");
   const url = new URL(`${XBL_BASE}/friends/search`);
   url.searchParams.set("gt", displayName);
 
