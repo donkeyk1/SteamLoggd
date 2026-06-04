@@ -67,6 +67,7 @@ model Game {
   id            String     @id @default(cuid())
   igdbId        Int?       @unique
   steamAppId    Int?       @unique
+  xboxTitleId   String?    @unique // Xbox Live title id (stored as string — uint32 can exceed int4)
   title         String
   coverUrl      String?
   genres        String[]   @default([])
@@ -83,6 +84,7 @@ model Game {
 
 enum GameSource {
   STEAM
+  XBOX
   MANUAL
 }
 

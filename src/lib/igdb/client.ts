@@ -133,6 +133,19 @@ function toSearchResult(g: IgdbGame): GameSearchResult {
 }
 
 /**
+ * Match a single game by name — one IGDB query, best result only. Used to
+ * enrich games that have no store-id mapping (Xbox, other non-Steam sources).
+ */
+export async function searchOneByName(name: string): Promise<GameSearchResult | null> {
+  const q = name.trim();
+  if (!q) return null;
+  const escaped = escapeIgdbString(q);
+  const query = `search "${escaped}"; fields name, first_release_date, cover.image_id, genres.name, themes.name; where version_parent = null; limit 1;`;
+  const results = await igdbFetch<IgdbGame[]>("games", query).catch(() => [] as IgdbGame[]);
+  return results[0] ? toSearchResult(results[0]) : null;
+}
+
+/**
  * Look up IGDB games by Steam app IDs (category=1 in external_games).
  * Returns a map from steamAppId -> IGDB game data.
  */

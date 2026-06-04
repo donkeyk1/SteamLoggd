@@ -19,7 +19,7 @@ import { GameCover } from "@/components/ui/game-cover";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { DiceIcon, SparkleIcon, ArrowRight, StarIcon } from "@/components/ui/icons";
-import { SyncSteamButton } from "./sync-button";
+import { SyncButton } from "./sync-button";
 
 function formatPlaytime(minutes: number | null | undefined) {
   if (!minutes) return "—";
@@ -56,6 +56,7 @@ export default async function DashboardPage() {
     statusCountsRaw,
     beatThisYear,
     allUserGames,
+    xboxAccount,
   ] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
@@ -123,7 +124,13 @@ export default async function DashboardPage() {
         game: { select: { genres: true } },
       },
     }),
+    db.account.findFirst({
+      where: { userId, provider: "xbox" },
+      select: { id: true },
+    }),
   ]);
+
+  const xboxLinked = !!xboxAccount;
 
   if (!user) redirect("/");
 
@@ -217,7 +224,8 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="flex gap-2 items-center">
-            <SyncSteamButton />
+            {steamId && <SyncButton endpoint="/api/sync/steam" label="Sync Steam" />}
+            {xboxLinked && <SyncButton endpoint="/api/sync/xbox" label="Sync Xbox" />}
             <Link href="/recommend" className="hf-btn hf-btn-primary btn-press">
               <DiceIcon size={14} /> What should I play?
             </Link>

@@ -4,11 +4,21 @@ import {
   lookupBySteamAppIds,
   fetchTimeToBeats,
   fetchGamesByIgdbIds,
+  searchOneByName,
   type GameSearchResult,
 } from "@/lib/igdb/client";
 
+// Title-matching is one IGDB request per game (no batch endpoint like Steam's),
+// so bound the work per pass and throttle to respect IGDB's ~4 req/s limit.
+// Unmatched games remain for the next sync.
+const TITLE_MATCH_LIMIT = 20;
+const TITLE_MATCH_DELAY_MS = 280;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export type EnrichResult = {
   igdbEnriched: number;
+  titleMatched: number;
+  titleMatchRemaining: number;
   themesBackfilled: number;
   ttbEnriched: number;
   dropped: string[];
@@ -46,6 +56,13 @@ async function attachIgdb(
     const canonical = await db.game.findUnique({ where: { igdbId: igdb.igdbId } });
     if (!canonical || canonical.id === gameId) return "skipped";
 
+    // Capture the orphan's store ids before we delete it, so the canonical can
+    // absorb them (below) and future syncs upsert into the canonical row.
+    const orphan = await db.game.findUnique({
+      where: { id: gameId },
+      select: { steamAppId: true, xboxTitleId: true },
+    });
+
     const dupes = await db.userGame.findMany({ where: { gameId } });
     for (const ug of dupes) {
       const collision = await db.userGame.findUnique({
@@ -65,6 +82,21 @@ async function attachIgdb(
       }
     }
     await db.game.delete({ where: { id: gameId } });
+
+    // Absorb the orphan's store ids (now freed by the delete) so the canonical
+    // row owns them. Without this, the next Steam/Xbox sync re-creates the
+    // orphan from its store id and re-merges it every time — wasted work, and
+    // it would burn a throttled title-match slot each sync for Xbox overlaps.
+    const transfer: { steamAppId?: number; xboxTitleId?: string } = {};
+    if (orphan?.steamAppId != null && canonical.steamAppId == null) {
+      transfer.steamAppId = orphan.steamAppId;
+    }
+    if (orphan?.xboxTitleId != null && canonical.xboxTitleId == null) {
+      transfer.xboxTitleId = orphan.xboxTitleId;
+    }
+    if (Object.keys(transfer).length > 0) {
+      await db.game.update({ where: { id: canonical.id }, data: transfer });
+    }
     return "merged";
   }
 }
@@ -102,6 +134,36 @@ export async function enrichUserLibrary(userId: string): Promise<EnrichResult> {
       }
     }
   }
+
+  // ── Step 1a2: match non-Steam games (Xbox, etc.) by title ─────────────────
+  // These have no store-id mapping, so they're matched one IGDB search at a
+  // time. Bounded per pass; the count of leftovers is returned so the caller
+  // can tell the user to sync again.
+  const titleCandidates = await db.game.findMany({
+    where: {
+      igdbId: null,
+      steamAppId: null,
+      xboxTitleId: { not: null },
+      userGames: { some: { userId } },
+    },
+    select: { id: true, title: true },
+  });
+
+  let titleMatched = 0;
+  const titleBatch = titleCandidates.slice(0, TITLE_MATCH_LIMIT);
+  for (const g of titleBatch) {
+    const igdb = await searchOneByName(g.title).catch(() => null);
+    if (igdb) {
+      try {
+        const result = await attachIgdb(g.id, igdb);
+        if (result === "updated" || result === "merged") titleMatched++;
+      } catch (err) {
+        console.error(`[enrich] title attach failed for ${g.id}:`, err);
+      }
+    }
+    await sleep(TITLE_MATCH_DELAY_MS);
+  }
+  const titleMatchRemaining = Math.max(0, titleCandidates.length - titleBatch.length);
 
   // ── Step 1b: backfill themes on games matched before we fetched themes ────
   const themeCandidates = await db.game.findMany({
@@ -176,5 +238,5 @@ export async function enrichUserLibrary(userId: string): Promise<EnrichResult> {
     where: { igdbId: null, steamAppId: { not: null }, userGames: { none: {} } },
   });
 
-  return { igdbEnriched, themesBackfilled, ttbEnriched, dropped };
+  return { igdbEnriched, titleMatched, titleMatchRemaining, themesBackfilled, ttbEnriched, dropped };
 }

@@ -5,6 +5,7 @@ import { TopNav } from "@/components/ui/top-nav";
 import { SignOutButton } from "./sign-out-button";
 import { DeleteAccountButton } from "./delete-account-button";
 import { UnlinkSteamButton } from "./unlink-steam-button";
+import { LinkXboxForm, UnlinkXboxButton } from "./link-xbox-form";
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
@@ -62,6 +63,7 @@ export default async function ProfilePage({
 
   const linkedProviders = new Set(accounts.map((a) => a.provider));
   const steamAccount = accounts.find((a) => a.provider === "steam");
+  const xboxAccount = accounts.find((a) => a.provider === "xbox");
   const unlinkedOauth = ALL_OAUTH.filter((p) => !linkedProviders.has(p));
 
   return (
@@ -148,6 +150,43 @@ export default async function ProfilePage({
                   >
                     Link Steam
                   </a>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <div style={{ borderTop: "1px solid var(--hf-border-soft)" }} />
+
+          {/* Xbox section */}
+          <section>
+            <div className="hf-cap" style={{ marginBottom: 14, fontSize: 11 }}>XBOX</div>
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: 11,
+                background: "var(--hf-surface)",
+                border: "1px solid var(--hf-border-soft)",
+              }}
+            >
+              {xboxAccount ? (
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--hf-emerald)" }}>Linked</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-fg-muted)", marginTop: 3 }}>
+                      Sync your Xbox &amp; Game Pass library from the dashboard.
+                    </div>
+                  </div>
+                  <UnlinkXboxButton />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>Not linked</div>
+                    <div style={{ fontSize: 12, color: "var(--hf-fg-muted)", marginTop: 3 }}>
+                      Enter your gamertag to sync games from Xbox console and the Xbox app on Windows.
+                    </div>
+                  </div>
+                  <LinkXboxForm />
                 </div>
               )}
             </div>

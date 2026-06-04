@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { enrichUserLibrary } from "@/lib/igdb/enrich";
 
+// Title-matching for non-Steam games is throttled.
+export const maxDuration = 60;
+
 /**
  * Standalone enrichment pass (IGDB metadata + themes + time-to-beat, and prune
  * of untouched unmatched games). The Steam sync runs the same pipeline inline;
