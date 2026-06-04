@@ -28,18 +28,32 @@ type ProfileUser = {
   settings?: ProfileSetting[];
 };
 
-/** Resolve a gamertag to its stable XUID (plus display name + avatar). */
+/** Resolve a gamertag to its stable XUID (plus display name + avatar).
+ *  Accepts "Donkey8758", "Donkey#8758", or legacy "DonkeyKong" formats. */
 export async function resolveGamertag(gamertag: string): Promise<XboxProfile | null> {
-  const res = await fetch(`${XBL_BASE}/search/${encodeURIComponent(gamertag)}`, {
-    headers: xblHeaders(),
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
+  // Xbox.com URLs use the combined form without #: "Donkey#8758" → "Donkey8758".
+  const normalized = gamertag.trim().replace("#", "");
+  const url = new URL(`${XBL_BASE}/friends/search`);
+  url.searchParams.set("gt", normalized);
 
-  const json = (await res.json().catch(() => null)) as
-    | { profileUsers?: ProfileUser[]; people?: ProfileUser[] }
-    | null;
-  const user = json?.profileUsers?.[0] ?? json?.people?.[0];
+  const res = await fetch(url, { headers: xblHeaders(), cache: "no-store" });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenXBL ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const raw = await res.json().catch(() => null);
+  // OpenXBL wraps the payload in a `content` key.
+  const json = raw as {
+    content?: { profileUsers?: ProfileUser[] };
+    profileUsers?: ProfileUser[];
+    people?: ProfileUser[];
+  } | null;
+  const user =
+    json?.content?.profileUsers?.[0] ??
+    json?.profileUsers?.[0] ??
+    json?.people?.[0];
   if (!user) return null;
 
   const xuid = user.id ?? user.xuid;
@@ -81,8 +95,10 @@ export async function fetchTitleHistory(xuid: string): Promise<XboxTitle[]> {
     throw new Error(`Xbox titleHistory failed: ${res.status} ${res.statusText}`);
   }
 
-  const json = (await res.json().catch(() => null)) as { titles?: RawTitle[] } | null;
-  const titles = json?.titles ?? [];
+  const raw = await res.json().catch(() => null);
+  // OpenXBL wraps responses in a `content` key.
+  const json = raw as { content?: { titles?: RawTitle[] }; titles?: RawTitle[] } | null;
+  const titles = json?.content?.titles ?? json?.titles ?? [];
 
   return titles
     .filter((t) => t.titleId != null && !!t.name && (t.type ? t.type === "Game" : true))
