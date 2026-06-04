@@ -50,13 +50,17 @@ export async function resolveGamertag(gamertag: string): Promise<XboxProfile | n
 
   const raw = await res.json().catch(() => null);
 
-  const json = raw as { profileUsers?: ProfileUser[]; people?: ProfileUser[] } | null;
-  const user = json?.profileUsers?.[0] ?? json?.people?.[0];
-  if (!user) {
-    // Include the raw response shape so the caller can surface it for debugging.
-    const keys = raw ? JSON.stringify(raw).slice(0, 400) : "null";
-    throw new Error(`parse_failed: ${keys}`);
-  }
+  const json = raw as {
+    content?: { profileUsers?: ProfileUser[] };
+    profileUsers?: ProfileUser[];
+    people?: ProfileUser[];
+  } | null;
+  // OpenXBL wraps the actual payload in a `content` key.
+  const user =
+    json?.content?.profileUsers?.[0] ??
+    json?.profileUsers?.[0] ??
+    json?.people?.[0];
+  if (!user) return null;
 
   const xuid = user.id ?? user.xuid;
   if (!xuid) return null;
