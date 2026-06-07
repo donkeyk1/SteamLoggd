@@ -70,7 +70,7 @@ export default async function ProfilePage({
     <main className="min-h-screen flex flex-col" style={{ background: "var(--hf-bg)" }}>
       <TopNav active="dashboard" username={session.username ?? session.name} steamLinked={!!steamAccount} />
 
-      <div style={{ maxWidth: 520, margin: "0 auto", padding: "36px 24px", width: "100%" }}>
+      <div className="px-5 pt-9 pb-28 md:px-6 md:pb-9" style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
         <div style={{ marginBottom: 28 }}>
           <Link href="/dashboard" style={{ fontSize: 13, color: "var(--hf-fg-muted)", textDecoration: "none" }}>
             ← Dashboard

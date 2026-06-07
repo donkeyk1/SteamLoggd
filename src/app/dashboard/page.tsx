@@ -207,15 +207,15 @@ export default async function DashboardPage() {
   const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
 
   return (
-    <main className="min-h-screen hf-scroll" style={{ background: "var(--hf-bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <main className="min-h-screen md:h-screen md:overflow-hidden hf-scroll flex flex-col" style={{ background: "var(--hf-bg)" }}>
       <TopNav active="dashboard" username={user.username ?? user.name} steamLinked={!!steamId} />
 
-      <div className="flex-1 flex flex-col gap-5" style={{ padding: "24px 36px 32px", overflowY: "auto" }}>
+      <div className="flex-1 flex flex-col gap-5 px-4 pt-5 pb-24 md:px-9 md:pt-6 md:pb-8 md:min-h-0 md:overflow-y-auto">
         {/* Greeting */}
-        <div className="flex justify-between items-end animate-fade">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end animate-fade">
           <div>
             <div className="hf-cap" style={{ marginBottom: 4 }}>WELCOME BACK · {dayName}</div>
-            <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.05 }}>
+            <h1 className="text-[26px] sm:text-3xl" style={{ fontWeight: 600, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.05 }}>
               Hey, {user.username ?? user.name ?? "there"}.
             </h1>
             <div style={{ fontSize: 14, color: "var(--hf-fg-muted)", marginTop: 6 }}>
@@ -223,7 +223,7 @@ export default async function DashboardPage() {
               {" · "}{beatThisYear} beat this year
             </div>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {steamId && <SyncButton endpoint="/api/sync/steam" label="Sync Steam" />}
             {xboxLinked && <SyncButton endpoint="/api/sync/xbox" label="Sync Xbox" />}
             <Link href="/recommend" className="hf-btn hf-btn-primary btn-press">
@@ -234,7 +234,7 @@ export default async function DashboardPage() {
 
         {/* NOW PLAYING hero */}
         {playingGames.length > 0 && (
-          <section className="animate-in stagger-1 flex gap-3.5">
+          <section className="animate-in stagger-1 flex flex-col md:flex-row gap-3.5">
             {playingGames.map((row) => (
               <NowPlayingHero
                 key={row.id}
@@ -247,7 +247,7 @@ export default async function DashboardPage() {
         )}
 
         {/* Stat row */}
-        <div className="grid grid-cols-4 gap-3.5 animate-in stagger-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 animate-in stagger-2">
           <StatTile label="GAMES TRACKED" value={user._count.userGames.toLocaleString()} sub={`${topGenres.length > 0 ? topGenres[0].genre + " dominant" : ""}`} accent="var(--hf-violet)" />
           <StatTile label={`BEAT IN ${currentYear}`} value={beatThisYear.toString()} color="var(--hf-emerald)" accent="var(--hf-emerald)" />
           <div className="hf-card card-hover p-[18px] relative overflow-hidden flex flex-col justify-between" style={{ minHeight: 130 }}>
@@ -285,7 +285,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Two col: Quick Picks + By Status */}
-        <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 animate-in stagger-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3.5 animate-in stagger-3">
           <QuickPicks picks={topPicks} />
           <ByStatus statusCounts={statusCounts} total={statusTotal} />
         </div>
@@ -302,7 +302,7 @@ export default async function DashboardPage() {
                 See all {topRated.length} <ArrowRight size={11} color="var(--hf-violet-soft)" />
               </Link>
             </div>
-            <div className="grid grid-cols-12 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-2">
               {topRated.map((row) => (
                 <Link key={row.id} href={`/backlog?q=${encodeURIComponent(row.game.title)}`} className="relative cursor-pointer group card-hover" style={{ textDecoration: "none" }}>
                   <GameCover name={row.game.title} coverUrl={row.game.coverUrl} radius={8} />
@@ -416,9 +416,9 @@ function NowPlayingHero({
       )}
       <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(9,9,11,0.85) 0%, rgba(9,9,11,0.6) 50%, rgba(9,9,11,0.85) 100%)" }} />
 
-      <div className="relative flex gap-7 p-[26px]">
+      <div className="relative flex flex-col sm:flex-row gap-4 sm:gap-7 p-4 sm:p-[26px]">
         <GameCover name={game.title} coverUrl={game.coverUrl} w={coverW} h={coverH} radius={12} glow />
-        <div className="flex-1 flex flex-col justify-between min-w-0">
+        <div className="flex-1 flex flex-col justify-between min-w-0 gap-4 sm:gap-0">
           <div>
             <div
               className="inline-flex items-center gap-1.5"
@@ -444,7 +444,7 @@ function NowPlayingHero({
               </span>
             </div>
             <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <h2 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.03em", margin: "10px 0 4px", lineHeight: 1, transition: "color 0.15s ease" }} className="hover:text-violet-400">
+              <h2 className="text-[26px] sm:text-[32px] hover:text-violet-400" style={{ fontWeight: 600, letterSpacing: "-0.03em", margin: "10px 0 4px", lineHeight: 1, transition: "color 0.15s ease" }}>
                 {game.title}
               </h2>
             </Link>
@@ -479,7 +479,7 @@ function NowPlayingHero({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5 items-end justify-end shrink-0">
+        <div className="flex flex-row sm:flex-col gap-1.5 sm:items-end justify-end shrink-0">
           <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} className="hf-btn btn-press">Mark beat</Link>
           <Link href={`/backlog?q=${encodeURIComponent(game.title)}`} className="hf-btn hf-btn-ghost btn-press" style={{ fontSize: 12 }}>Pause</Link>
         </div>
