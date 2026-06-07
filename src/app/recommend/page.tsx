@@ -23,16 +23,15 @@ export default async function RecommendPage() {
 
   return (
     <main
-      className="min-h-screen flex flex-col"
+      className="min-h-screen md:h-screen md:overflow-hidden flex flex-col"
       style={{
         background: "var(--hf-bg)",
         backgroundImage: "radial-gradient(ellipse 50% 40% at 50% 0%, var(--hf-violet-bg) 0%, transparent 70%)",
-        overflow: "hidden",
       }}
     >
       <TopNav active="shuffle" username={session.username ?? session.name} steamLinked={!!session.steamId} />
 
-      <div className="flex-1 flex flex-col" style={{ padding: "24px 40px 32px", minHeight: 0 }}>
+      <div className="flex-1 flex flex-col px-4 pt-5 pb-24 md:px-10 md:pt-6 md:pb-8 md:min-h-0">
         <RecommendClient baseEligible={baseEligible} multiplayerEligible={multiplayerEligible} />
       </div>
     </main>

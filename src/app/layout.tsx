@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,13 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "SteamLoggd",
   description: "Track what you own, what you're playing, and what to play next.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#09090b",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wordmark } from "./wordmark";
 import { DiceIcon } from "./icons";
+import { BottomNav } from "./bottom-nav";
 
 export function TopNav({
   active = "shuffle",
@@ -22,20 +23,17 @@ export function TopNav({
       {/* Steam link banner for users without Steam connected */}
       {!steamLinked && (
         <div
+          className="flex items-center justify-center gap-2 sm:gap-3 text-center px-3 py-2 sm:px-7"
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            padding: "8px 28px",
             background: "linear-gradient(90deg, var(--hf-violet-bg) 0%, rgba(34,211,238,0.06) 100%)",
             borderBottom: "1px solid rgba(139,92,246,0.15)",
-            fontSize: 13,
+            fontSize: 12.5,
             color: "var(--hf-fg-muted)",
           }}
         >
           <span>
-            Link your <span style={{ color: "var(--hf-fg)", fontWeight: 500 }}>Steam account</span> to sync your library and track playtime
+            Link your <span style={{ color: "var(--hf-fg)", fontWeight: 500 }}>Steam account</span>
+            <span className="hidden sm:inline"> to sync your library and track playtime</span>
           </span>
           <a
             href="/api/steam/link/start"
@@ -55,9 +53,8 @@ export function TopNav({
       )}
 
       <div
-        className="flex items-center justify-between"
+        className="flex items-center justify-between px-4 py-3 sm:px-7"
         style={{
-          padding: "14px 28px",
           borderBottom: "1px solid var(--hf-border-soft)",
           background: "rgba(9,9,11,0.85)",
           backdropFilter: "blur(12px)",
@@ -66,7 +63,7 @@ export function TopNav({
       >
         <div className="flex items-center gap-7">
           <Wordmark size={18} href="/dashboard" />
-          <nav className="flex gap-1">
+          <nav className="hidden md:flex gap-1">
             {items.map((it) => {
               const isActive = active === it.id;
               const isShuffle = it.id === "shuffle";
@@ -132,6 +129,9 @@ export function TopNav({
           />
         </div>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <BottomNav active={active} />
     </div>
   );
 }

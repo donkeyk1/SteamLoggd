@@ -76,15 +76,15 @@ export default async function BacklogPage({
   }
 
   return (
-    <main className="min-h-screen hf-scroll flex flex-col" style={{ background: "var(--hf-bg)", overflow: "hidden" }}>
+    <main className="min-h-screen md:h-screen md:overflow-hidden hf-scroll flex flex-col" style={{ background: "var(--hf-bg)" }}>
       <TopNav active="backlog" username={session.username ?? session.name} steamLinked={!!session.steamId} />
 
-      <div className="flex-1 flex flex-col gap-4" style={{ padding: "24px 36px 32px", overflow: "hidden" }}>
+      <div className="flex-1 flex flex-col gap-4 px-4 pt-5 pb-24 md:px-9 md:pt-6 md:pb-8 md:min-h-0 md:overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-end animate-fade">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end animate-fade">
           <div>
             <div className="hf-cap" style={{ marginBottom: 4 }}>LIBRARY · STEAM SYNCED</div>
-            <h1 className="flex items-baseline gap-3" style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.03em", margin: 0 }}>
+            <h1 className="flex items-baseline gap-3 text-[26px] sm:text-3xl" style={{ fontWeight: 600, letterSpacing: "-0.03em", margin: 0 }}>
               Backlog
               <span className="hf-mono" style={{ fontSize: 16, color: "var(--hf-fg-dim)", fontWeight: 400, letterSpacing: "0.02em" }}>
                 {totalCount} games
@@ -161,7 +161,7 @@ export default async function BacklogPage({
         </div>
 
         {/* Table */}
-        <div className="animate-in stagger-3 flex-1 min-h-0 overflow-hidden">
+        <div className="animate-in stagger-3 md:flex-1 md:min-h-0 md:overflow-hidden">
           <BacklogTable rows={games} showRemove={isUnenriched} />
         </div>
 

@@ -60,6 +60,25 @@ export function SearchIcon({ size = 13, color = "var(--hf-fg-dim)" }: { size?: n
   );
 }
 
+export function HomeIcon({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" />
+    </svg>
+  );
+}
+
+export function LibraryIcon({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="5" height="16" rx="1" />
+      <rect x="10.5" y="4" width="5" height="16" rx="1" />
+      <path d="M18 5l3 1-3 14-3-1" />
+    </svg>
+  );
+}
+
 export function ChevronDown({ size = 10, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round">
