@@ -21,6 +21,148 @@ function formatPlaytime(minutes: number | null | undefined) {
   return `${Math.round(hours)}h`;
 }
 
+/** Mobile card — tap the body to (de)select; status & rating/priority are
+ *  tappable native pickers; mode/genre/platform/playtime are read-only meta. */
+function MobileCard({
+  row,
+  selected,
+  saving,
+  showRemove,
+  onToggle,
+  onPatch,
+  onRemove,
+}: {
+  row: Row;
+  selected: boolean;
+  saving: boolean;
+  showRemove?: boolean;
+  onToggle: () => void;
+  onPatch: (body: Record<string, unknown>) => void;
+  onRemove: () => void;
+}) {
+  const isFinished = row.status === "BEAT" || row.status === "DROPPED";
+  const platform = row.source === "STEAM" ? "Steam" : row.source === "XBOX" ? "Xbox" : row.platform || null;
+  const meta = [
+    row.lastPlayedAt ? `last ${row.lastPlayedAt.toLocaleDateString()}` : row.game.releaseYear ? `${row.game.releaseYear}` : "never played",
+    platform,
+    row.steamPlaytimeMinutes ? formatPlaytime(row.steamPlaytimeMinutes) : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <div
+      onClick={(e) => {
+        const tag = (e.target as HTMLElement).tagName;
+        if (["SELECT", "OPTION", "BUTTON", "INPUT", "A"].includes(tag)) return;
+        onToggle();
+      }}
+      className="flex gap-3 p-3 rounded-xl"
+      style={{
+        border: `1px solid ${selected ? "rgba(139,92,246,0.5)" : "var(--hf-border-soft)"}`,
+        background: selected
+          ? "rgba(139,92,246,0.08)"
+          : row.status === "PLAYING"
+            ? "rgba(34,211,238,0.04)"
+            : "rgba(255,255,255,0.015)",
+      }}
+    >
+      <GameCover name={row.game.title} coverUrl={row.game.coverUrl} w={52} h={70} radius={6} />
+      <div className="flex-1 min-w-0 flex flex-col gap-2">
+        <div className="min-w-0">
+          <div style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {row.game.title}
+          </div>
+          <div className="hf-mono" style={{ fontSize: 11, color: "var(--hf-fg-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {meta}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status */}
+          <div className="relative">
+            <StatusPill status={row.status} />
+            <select
+              value={row.status}
+              disabled={saving}
+              onChange={(e) => onPatch({ status: e.target.value as GameStatus })}
+              className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+              style={{ width: "100%", height: "100%" }}
+              aria-label="Change status"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s} className="bg-zinc-900 text-zinc-50">{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rating (finished) or Priority */}
+          <div className="relative">
+            {isFinished ? (
+              <>
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <StarIcon key={j} size={12} color={j < (row.rating ?? 0) ? "var(--hf-amber)" : "var(--hf-fg-faint)"} filled={j < (row.rating ?? 0)} />
+                  ))}
+                </div>
+                <select
+                  value={row.rating ?? ""}
+                  disabled={saving}
+                  onChange={(e) => onPatch({ rating: e.target.value ? Number(e.target.value) : null })}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                  style={{ width: "100%", height: "100%" }}
+                  aria-label="Change rating"
+                >
+                  <option value="" className="bg-zinc-900">No rating</option>
+                  {[1, 2, 3, 4, 5].map((r) => (
+                    <option key={r} value={r} className="bg-zinc-900">{"★".repeat(r)}{"☆".repeat(5 - r)}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <PriorityChip level={row.priority} />
+                <select
+                  value={row.priority >= 4 ? 5 : row.priority >= 3 ? 3 : 1}
+                  disabled={saving}
+                  onChange={(e) => onPatch({ priority: Number(e.target.value) })}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
+                  style={{ width: "100%", height: "100%" }}
+                  aria-label="Change priority"
+                >
+                  <option value={5} className="bg-zinc-900">High</option>
+                  <option value={3} className="bg-zinc-900">Medium</option>
+                  <option value={1} className="bg-zinc-900">Low</option>
+                </select>
+              </>
+            )}
+          </div>
+
+          {/* Mode (read-only chip) */}
+          <span className="hf-mono" style={{ fontSize: 10.5, letterSpacing: "0.04em", color: row.isMultiplayer ? "var(--hf-cyan)" : "var(--hf-fg-dim)" }}>
+            {row.isMultiplayer ? "MP" : "SP"}
+          </span>
+
+          {row.game.genres.length > 0 && (
+            <span style={{ fontSize: 11.5, color: "var(--hf-fg-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+              {row.game.genres.slice(0, 2).join(" · ")}
+            </span>
+          )}
+
+          {showRemove && (
+            <button
+              onClick={onRemove}
+              disabled={saving}
+              className="hf-btn hf-btn-ghost btn-press ml-auto"
+              style={{ padding: "4px 8px", fontSize: 11.5, color: "var(--hf-rose)" }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PriorityChip({ level }: { level: number }) {
   const map: Record<number, { dots: number; color: string; label: string }> = {
     5: { dots: 3, color: "var(--hf-amber)", label: "High" },
@@ -216,9 +358,28 @@ export function BacklogTable({
         </div>
       )}
 
-      {/* Table */}
+      {/* Mobile card list */}
+      <div className="md:hidden flex flex-col gap-2">
+        {rows.map((row) => (
+          <MobileCard
+            key={row.id}
+            row={row}
+            selected={selected.has(row.id)}
+            saving={savingId === row.id}
+            showRemove={showRemove}
+            onToggle={() => toggle(row.id)}
+            onPatch={(body) => patch(row.id, body)}
+            onRemove={() => remove(row.id)}
+          />
+        ))}
+        <div className="hf-mono" style={{ fontSize: 11.5, color: "var(--hf-fg-dim)", padding: "4px 2px" }}>
+          showing {rows.length} game{rows.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+
+      {/* Desktop table */}
       <div
-        className="flex flex-col flex-1 min-h-0 overflow-hidden"
+        className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden"
         style={{
           borderRadius: 14,
           border: "1px solid var(--hf-border-soft)",

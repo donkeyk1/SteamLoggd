@@ -65,9 +65,9 @@ export function FilterBar({
   return (
     <div className="flex flex-col gap-3">
       {/* Status filter tabs */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:gap-3">
         <div
-          className="flex gap-1"
+          className="flex gap-1 overflow-x-auto hf-scroll"
           style={{
             padding: 4,
             borderRadius: 10,
@@ -97,7 +97,7 @@ export function FilterBar({
                 key={tab.value}
                 type="button"
                 onClick={() => update({ status: tab.value === "all" ? undefined : tab.value })}
-                className="filter-tab-hover"
+                className="filter-tab-hover shrink-0 whitespace-nowrap"
                 style={{
                   padding: "6px 12px",
                   borderRadius: 7,
@@ -166,17 +166,16 @@ export function FilterBar({
           </button>
         </div>
 
-        <div style={{ flex: 1 }} />
+        <div className="hidden sm:block" style={{ flex: 1 }} />
 
         {/* Search */}
         <div
-          className="flex items-center gap-2 search-box-hover"
+          className="flex items-center gap-2 search-box-hover w-full sm:w-60"
           style={{
             padding: "7px 12px",
             borderRadius: 9,
             background: "rgba(255,255,255,0.025)",
             border: "1px solid var(--hf-border-soft)",
-            width: 240,
           }}
         >
           <SearchIcon />
@@ -188,7 +187,7 @@ export function FilterBar({
             className="bg-transparent border-none outline-none flex-1 text-zinc-50"
             style={{ fontSize: 12.5, color: "var(--hf-fg)" }}
           />
-          <span className="hf-mono" style={{ fontSize: 10, color: "var(--hf-fg-dim)", padding: "2px 6px", background: "rgba(255,255,255,0.05)", borderRadius: 4 }}>
+          <span className="hf-mono hidden sm:block" style={{ fontSize: 10, color: "var(--hf-fg-dim)", padding: "2px 6px", background: "rgba(255,255,255,0.05)", borderRadius: 4 }}>
             ⌘K
           </span>
         </div>
