@@ -20,9 +20,9 @@ export default async function Home() {
       }}
     >
       {/* Nav */}
-      <header className="flex items-center justify-between px-9 py-5 relative z-10 animate-fade">
+      <header className="flex items-center justify-between px-5 py-4 sm:px-9 sm:py-5 relative z-10 animate-fade">
         <Wordmark size={20} />
-        <nav className="flex items-center gap-5" style={{ fontSize: 13.5, color: "var(--hf-fg-muted)" }}>
+        <nav className="flex items-center gap-3 sm:gap-5" style={{ fontSize: 13.5, color: "var(--hf-fg-muted)" }}>
           <Link href="/signin" className="hover:text-white transition-colors" style={{ textDecoration: "none", color: "inherit" }}>
             Sign in
           </Link>
@@ -37,11 +37,11 @@ export default async function Home() {
       </header>
 
       {/* Main grid */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-0 px-9 pb-7 pt-8 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-0 px-5 pb-12 pt-6 sm:px-9 sm:pb-7 sm:pt-8 min-h-0">
         {/* LEFT */}
-        <section className="flex flex-col justify-center max-w-[620px] pr-10 animate-in">
+        <section className="flex flex-col justify-center max-w-[620px] pr-0 lg:pr-10 animate-in">
           <div
-            className="inline-flex items-center gap-2 self-start mb-5"
+            className="inline-flex items-center gap-2 self-start mb-4 sm:mb-5"
             style={{
               padding: "5px 11px",
               borderRadius: 999,
@@ -55,9 +55,8 @@ export default async function Home() {
           </div>
 
           <h1
-            className="animate-in stagger-1"
+            className="animate-in stagger-1 text-[44px] sm:text-[62px] lg:text-[76px]"
             style={{
-              fontSize: 76,
               fontWeight: 600,
               letterSpacing: "-0.045em",
               lineHeight: 0.96,
@@ -83,11 +82,11 @@ export default async function Home() {
           <p
             className="animate-in stagger-2"
             style={{
-              fontSize: 18,
+              fontSize: 16,
               color: "var(--hf-fg-muted)",
               lineHeight: 1.5,
               margin: 0,
-              marginBottom: 34,
+              marginBottom: 28,
               letterSpacing: "-0.005em",
               maxWidth: 500,
             }}
@@ -97,11 +96,11 @@ export default async function Home() {
           </p>
 
           {/* CTA */}
-          <div className="flex gap-3 mb-11 animate-in stagger-3">
+          <div className="flex flex-col sm:flex-row gap-3 mb-8 sm:mb-11 animate-in stagger-3">
             <Link
               href="/signin"
-              className="hf-btn hf-btn-primary hf-btn-big btn-press inline-flex items-center gap-2"
-              style={{ textDecoration: "none", fontSize: 17, padding: "16px 28px" }}
+              className="hf-btn hf-btn-primary hf-btn-big btn-press inline-flex items-center justify-center gap-2"
+              style={{ textDecoration: "none", fontSize: 16, padding: "14px 24px" }}
             >
               Get started — it&apos;s free <ArrowRight size={14} />
             </Link>
@@ -109,7 +108,7 @@ export default async function Home() {
 
           {/* Value props */}
           <div
-            className="grid grid-cols-3 gap-3.5 pt-6 animate-in stagger-4"
+            className="grid grid-cols-3 gap-2 sm:gap-3.5 pt-5 sm:pt-6 animate-in stagger-4"
             style={{ borderTop: "1px solid var(--hf-border-soft)" }}
           >
             {[
