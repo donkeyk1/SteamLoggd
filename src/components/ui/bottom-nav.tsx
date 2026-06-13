@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { DiceIcon, HomeIcon, LibraryIcon } from "./icons";
 
@@ -11,11 +15,23 @@ const ITEMS: { id: Active; label: string; href: string; Icon: typeof HomeIcon }[
 
 /**
  * Fixed bottom tab bar — mobile only (hidden at md+, where the top nav's inline
- * links take over). Pages that scroll on mobile should reserve space for it
- * (the shells add bottom padding).
+ * links take over).
+ *
+ * Rendered through a portal to <body> so its `position: fixed` is relative to
+ * the viewport, NOT to an ancestor. (The app's `.page-transition` wrapper keeps
+ * a `transform` via animation fill-mode, which would otherwise become the
+ * containing block and pin this bar to the bottom of the page content.)
  */
 export function BottomNav({ active = "dashboard" }: { active?: Active }) {
-  return (
+  // Portal target (document.body) only exists after mount; render nothing on
+  // the server / first paint to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+  if (!mounted) return null;
+
+  const bar = (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
       style={{
@@ -51,4 +67,6 @@ export function BottomNav({ active = "dashboard" }: { active?: Active }) {
       })}
     </nav>
   );
+
+  return createPortal(bar, document.body);
 }

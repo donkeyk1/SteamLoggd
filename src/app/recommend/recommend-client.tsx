@@ -203,12 +203,12 @@ function SetupState({
   onSubmit: () => void;
 }) {
   return (
-    <div className="animate-fade" style={{ display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 36, flex: 1, minHeight: 0 }}>
+    <div className="animate-fade grid grid-cols-1 md:grid-cols-[1.05fr_1fr] gap-6 md:gap-9 md:flex-1 md:min-h-0">
       {/* LEFT — controls */}
-      <div className="hf-scroll" style={{ display: "flex", flexDirection: "column", gap: 18, paddingTop: 8, overflowY: "auto", paddingRight: 4 }}>
+      <div className="hf-scroll flex flex-col gap-[18px] pt-2 md:overflow-y-auto md:pr-1">
         <div>
           <div className="hf-cap" style={{ marginBottom: 8 }}>STEP 01 · TUNE THE DECK</div>
-          <h1 style={{ fontSize: 42, fontWeight: 600, letterSpacing: "-0.035em", margin: 0, lineHeight: 1 }}>
+          <h1 className="text-4xl sm:text-[42px]" style={{ fontWeight: 600, letterSpacing: "-0.035em", margin: 0, lineHeight: 1 }}>
             What should I<br />
             <span className="hf-italic" style={{ color: "var(--hf-violet-soft)" }}>play next?</span>
           </h1>
@@ -241,7 +241,7 @@ function SetupState({
               {includeMultiplayer ? "Including multiplayer" : "Include multiplayer"}
             </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 7 }}>
+          <div className="grid grid-cols-3 sm:grid-cols-5" style={{ gap: 7 }}>
             {VIBES.map((v) => (
               <MoodCard key={v.id} mood={v} active={selectedVibes.includes(v.id)} onClick={() => onVibeToggle(v.id)} />
             ))}
@@ -259,7 +259,7 @@ function SetupState({
         </div>
 
         {/* Time today + Game length, side by side */}
-        <div style={{ display: "grid", gridTemplateColumns: "3fr 4fr", gap: 18 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-[3fr_4fr] gap-4 sm:gap-[18px]">
           <div>
             <div className="hf-cap" style={{ marginBottom: 10 }}>Time today?</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
@@ -304,8 +304,8 @@ function SetupState({
         </button>
       </div>
 
-      {/* RIGHT — deck preview */}
-      <div className="flex flex-col items-center justify-center relative">
+      {/* RIGHT — deck preview (decorative; hidden on mobile to save space) */}
+      <div className="hidden md:flex flex-col items-center justify-center relative">
         <DeckStack />
         <div style={{ marginTop: 16, textAlign: "center" }}>
           <div className="hf-mono" style={{ fontSize: 13, color: "var(--hf-fg-muted)", letterSpacing: "0.06em" }}>
@@ -505,10 +505,10 @@ function RevealState({
   return (
     <div className="animate-fade" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, paddingTop: 4 }}>
       {/* header */}
-      <div className="flex justify-between items-end" style={{ marginBottom: 20 }}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end" style={{ marginBottom: 20 }}>
         <div>
           <div className="hf-cap" style={{ marginBottom: 6, color: "var(--hf-violet-soft)" }}>YOUR HAND · {results.length} DEALT</div>
-          <h1 style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.035em", margin: 0, lineHeight: 1 }}>
+          <h1 className="text-[28px] sm:text-[34px]" style={{ fontWeight: 600, letterSpacing: "-0.035em", margin: 0, lineHeight: 1 }}>
             Pick your <span className="hf-italic" style={{ color: "var(--hf-violet-soft)" }}>next play.</span>
           </h1>
         </div>
@@ -523,9 +523,9 @@ function RevealState({
       </div>
 
       {/* main: cards + detail */}
-      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 40, flex: 1, minHeight: 0, alignItems: "start" }}>
-        {/* the three dealt cards */}
-        <div className="flex gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 md:gap-10 md:flex-1 md:min-h-0 md:items-start">
+        {/* the three dealt cards (swipe horizontally on mobile) */}
+        <div className="flex gap-3.5 overflow-x-auto hf-scroll -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
           {results.map((rec, i) => (
             <PickCard
               key={rec.userGameId}
@@ -626,7 +626,7 @@ function PickCard({
   return (
     <button
       onClick={onClick}
-      className="card-hover"
+      className="card-hover shrink-0"
       style={{
         position: "relative",
         display: "flex",
