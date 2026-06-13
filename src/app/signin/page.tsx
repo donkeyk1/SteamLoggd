@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 import { getSession } from "@/lib/session";
 import { Wordmark } from "@/components/ui/wordmark";
-import { ArrowRight } from "@/components/ui/icons";
 
 export default async function SignInPage({
   searchParams,
@@ -22,13 +21,14 @@ export default async function SignInPage({
       style={{
         background: "var(--hf-bg)",
         backgroundImage: "radial-gradient(ellipse 50% 40% at 50% 30%, var(--hf-violet-bg) 0%, transparent 70%)",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <div className="flex flex-col items-center gap-8 animate-fade" style={{ maxWidth: 440, width: "100%", padding: "0 24px" }}>
-        <Wordmark size={24} />
+      <div className="flex flex-col items-center gap-7 sm:gap-8 animate-fade" style={{ maxWidth: 440, width: "100%", padding: "0 20px" }}>
+        <Wordmark size={22} />
 
         <div style={{ textAlign: "center" }}>
-          <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.03em", margin: "0 0 8px" }}>
+          <h1 className="text-[26px] sm:text-[32px]" style={{ fontWeight: 600, letterSpacing: "-0.03em", margin: "0 0 8px" }}>
             Sign in to SteamLoggd
           </h1>
           <p style={{ fontSize: 15, color: "var(--hf-fg-muted)", lineHeight: 1.45 }}>
@@ -40,7 +40,7 @@ export default async function SignInPage({
           <SignInTrigger
             provider="google"
             label={
-              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ padding: "14px 24px", background: "#fff", color: "#1f1f1f", borderColor: "rgba(255,255,255,0.15)", fontWeight: 600 }}>
+              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ padding: "12px 24px", background: "#fff", color: "#1f1f1f", borderColor: "rgba(255,255,255,0.15)", fontWeight: 600 }}>
                 {PROVIDER_ICONS.google}
                 Continue with Google
               </span>
@@ -49,7 +49,7 @@ export default async function SignInPage({
           <SignInTrigger
             provider="github"
             label={
-              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ background: "rgba(255,255,255,0.06)", padding: "14px 24px" }}>
+              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ background: "rgba(255,255,255,0.06)", padding: "12px 24px" }}>
                 {PROVIDER_ICONS.github}
                 Continue with GitHub
               </span>
@@ -58,7 +58,7 @@ export default async function SignInPage({
           <SignInTrigger
             provider="discord"
             label={
-              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ background: "#5865F2", borderColor: "#4752c4", color: "#fff", padding: "14px 24px" }}>
+              <span className="hf-btn hf-btn-big w-full justify-center btn-press" style={{ background: "#5865F2", borderColor: "#4752c4", color: "#fff", padding: "12px 24px" }}>
                 {PROVIDER_ICONS.discord}
                 Continue with Discord
               </span>
